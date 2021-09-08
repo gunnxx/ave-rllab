@@ -23,6 +23,11 @@ class SquashedGaussianMLPModel(StochasticModel):
     "sample_scaling"
   ]
 
+  # Part of REQUIRED_CONFIG_KEYS to instantiate activation_fn
+  ACTIVATION_CONFIG_KEYS = [
+    "activation"
+  ]
+
   def __init__(self,
     input_dim: int,
     output_dim: int,
