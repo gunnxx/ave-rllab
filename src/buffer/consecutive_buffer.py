@@ -26,8 +26,9 @@ class ConsecutiveBuffer(Buffer):
   
   """
   """
-  def validate_params(self, params: Dict) -> None:
-    super().validate_params(params)
+  @staticmethod
+  def validate_params(params: Dict) -> None:
+    assert params["buffer_size"] > 0
     assert params["buffer_size"] >= params["consecutive_size"]
 
   """

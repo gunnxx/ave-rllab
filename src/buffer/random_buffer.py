@@ -13,7 +13,18 @@ class RandomBuffer(Buffer):
   REQUIRED_CONFIG_KEYS = {
     "buffer_size": 1e4
   }
+
+  """
+  """
+  def __init__(self, buffer_size: int) -> None:
+    super().__init__(buffer_size)
   
+  """
+  """
+  @staticmethod
+  def validate_params(params: Dict) -> None:
+    assert params["buffer_size"] > 0
+
   """
   """
   def _store_mechanism(self, **kwargs) -> None:

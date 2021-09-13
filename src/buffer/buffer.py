@@ -66,17 +66,10 @@ class Buffer:
   
   """
   """
-  def validate_params(self, params: Dict) -> None:
-    assert params["buffer_size"] > 0
-  
-  """
-  """
   @classmethod
   def instantiate_buffer(
     buffer_type: "Type[Buffer]",
     buffer_params: Dict) -> "Buffer":
     
-    buffer = buffer_type(**buffer_params)
-    buffer.validate_params(buffer_params)
-    
-    return buffer
+    buffer_type.validate_params(buffer_params)  
+    return buffer_type(**buffer_params)
