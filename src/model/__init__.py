@@ -1,8 +1,7 @@
 import torch.nn as nn
 
-from model.deterministic_mlp_model import DeterministicMLPModel
-from model.squashed_gaussian_mlp_model import SquashedGaussianMLPModel
-from torch.nn.modules.activation import Sigmoid
+from src.model.deterministic_mlp_model import DeterministicMLPModel
+from src.model.squashed_gaussian_mlp_model import SquashedGaussianMLPModel
 
 REGISTERED_MODEL = {
   'deterministic_mlp_model': DeterministicMLPModel,
