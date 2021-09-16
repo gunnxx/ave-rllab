@@ -1,3 +1,6 @@
 [submodule "env"]
 	path = env
 	url = https://github.com/gunnxx/kaushik_2020_famle.git
+[submodule "externals/famle"]
+	path = externals/famle
+	url = https://github.com/resibots/kaushik_2020_famle.git
