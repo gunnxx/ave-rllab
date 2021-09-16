@@ -41,7 +41,9 @@ class DeterministicMLPModel(Model):
   """
   @staticmethod
   def validate_params(params: Dict) -> None:
-    pass
+    assert params["input_dim"] > 0
+    assert params["output_dim"] > 0
+    assert len(params["hidden_size"]) >= 0
 
   """
   """

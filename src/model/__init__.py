@@ -12,5 +12,6 @@ REGISTERED_ACTIVATION_FUNC = {
   "tanh": nn.Tanh,
   "relu": nn.ReLU,
   "sigmoid": nn.Sigmoid,
-  "softmax": nn.Softmax
+  "softmax": nn.Softmax,
+  "identity": nn.Identity
 }
