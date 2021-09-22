@@ -1,9 +1,9 @@
-from typing import Dict, List, Type
+from typing import Dict, List
 
 import torch
 import torch.nn as nn
 
-from src.model.model import Model
+from src.model.model import Model, REGISTERED_ACTIVATION_FUNC
 from src.utils.common import create_mlp
 
 class DeterministicMLPModel(Model):
@@ -16,22 +16,19 @@ class DeterministicMLPModel(Model):
     "activation": "relu",
     "output_activation": "softmax"
   }
-
-  # Part of REQUIRED_CONFIG_KEYS to instantiate activation_fn
-  ACTIVATION_CONFIG_KEYS = {
-    "activation": None,
-    "output_activation": None
-  }
-
+  
   """
   """
   def __init__(self,
     input_dim: int,
     output_dim: int,
     hidden_size: List[int],
-    activation: Type[nn.Module],
-    output_activation: Type[nn.Module]):
+    activation: str,
+    output_activation: str):
     super().__init__()
+
+    activation = REGISTERED_ACTIVATION_FUNC[activation]
+    output_activation = REGISTERED_ACTIVATION_FUNC[output_activation]
 
     hidden_size : List[int] = [input_dim] + hidden_size + [output_dim]
     self.network : nn.Sequential = create_mlp(

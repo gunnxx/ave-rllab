@@ -14,13 +14,6 @@ class StochasticModel(Model):
 
   """
   """
-  def _log_prob_from_distribution(self,
-    distribution: distributions.Distribution,
-    sample: torch.Tensor) -> torch.Tensor:
-    raise NotImplementedError()
-
-  """
-  """
   def forward(self,
     x: torch.Tensor,
     deterministic: bool,
@@ -34,4 +27,4 @@ class StochasticModel(Model):
     x: torch.Tensor,
     sample: torch.Tensor) -> torch.Tensor:
     distribution = self._distribution(x)
-    return self._log_prob_from_distribution(distribution, sample)
+    return distribution.log_prob(sample)

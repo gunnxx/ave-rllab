@@ -1,7 +1,6 @@
 import pytest
 import torch
 
-from src.model import REGISTERED_ACTIVATION_FUNC
 from src.model.deterministic_mlp_model import DeterministicMLPModel
 
 def test_init_using_classmethod():
@@ -19,8 +18,8 @@ def test_init_using_classmethod():
     {"input_dim": 1,
      "output_dim": 1,
      "hidden_size": [],
-     "activation": REGISTERED_ACTIVATION_FUNC["relu"],
-     "output_activation": REGISTERED_ACTIVATION_FUNC["identity"]})
+     "activation": "relu",
+     "output_activation": "identity"})
 
 
 def test_method_forward():
@@ -32,8 +31,8 @@ def test_method_forward():
     input_dim=input_dim,
     output_dim=output_dim,
     hidden_size=hidden_size,
-    activation=REGISTERED_ACTIVATION_FUNC["identity"],
-    output_activation=REGISTERED_ACTIVATION_FUNC["identity"]
+    activation="identity",
+    output_activation="identity"
   )
 
   out = model(torch.randn(1, 2, 3, input_dim))

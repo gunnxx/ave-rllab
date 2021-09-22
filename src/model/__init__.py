@@ -1,17 +1,9 @@
 import torch.nn as nn
 
 from src.model.deterministic_mlp_model import DeterministicMLPModel
-from src.model.squashed_gaussian_mlp_model import SquashedGaussianMLPModel
+from src.model.gaussian_mlp_model import GaussianMLPModel
 
 REGISTERED_MODEL = {
   'deterministic_mlp_model': DeterministicMLPModel,
-  'squashed_gaussian_mlp_model': SquashedGaussianMLPModel
-}
-
-REGISTERED_ACTIVATION_FUNC = {
-  "tanh": nn.Tanh,
-  "relu": nn.ReLU,
-  "sigmoid": nn.Sigmoid,
-  "softmax": nn.Softmax,
-  "identity": nn.Identity
+  'gaussian_mlp_model': GaussianMLPModel
 }

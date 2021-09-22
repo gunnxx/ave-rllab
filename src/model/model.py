@@ -2,6 +2,14 @@ from typing import Dict, Type
 
 import torch.nn as nn
 
+REGISTERED_ACTIVATION_FUNC = {
+  "tanh": nn.Tanh,
+  "relu": nn.ReLU,
+  "sigmoid": nn.Sigmoid,
+  "softmax": nn.Softmax,
+  "identity": nn.Identity
+}
+
 class Model(nn.Module):
   """
   """
