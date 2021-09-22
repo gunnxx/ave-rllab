@@ -11,5 +11,5 @@ class BrokenReacherBulletEnv(ReacherBulletEnv, BrokenEnv):
   """
   """
   def step(self, a):
-    return ReacherBulletEnv(self,
+    return ReacherBulletEnv.step(self,
       BrokenEnv.apply_damage(self, a))
