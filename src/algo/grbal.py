@@ -113,6 +113,13 @@ class GrBAL:
       whether to use first-order MAML
     is_nested_grad:
       whether inner gradient is computed w.r.t meta-param
+  
+  notes:
+  `is_first_order = True` means using first-order MAML,
+  regardless the value of nested grad. `is_nested_grad = True`
+  means using nested-MAML and `is_nested_grad = False` means
+  using original-MAML. If `num_inner_grad_steps = 1`, then
+  nested-MAML is the same as original-MAML.
   """
   def __init__(self,
     env: gym.Env,
@@ -219,11 +226,18 @@ class GrBAL:
     for _ in range(self.num_inner_grad_steps):
       log_prob_model = clone_model_dynamics.log_prob_from_data(
         torch.cat([obs, act], dim=-1), next_obs)
-      
-      grad = torch.autograd.grad(
-        -log_prob_model.sum(),
-        clone_model_dynamics.parameters(),
-        create_graph=True)
+
+      # whether nested-MAML, orig-MAML, or fo-MAML
+      if self.is_nested_grad:
+        grad = torch.autograd.grad(
+          -log_prob_model.sum(),
+          self.model_dynamics.parameters(),
+          create_graph=(not self.is_first_order))
+      else:
+        grad = torch.autograd.grad(
+          -log_prob_model.sum(),
+          clone_model_dynamics.parameters(),
+          create_graph=(not self.is_first_order))
       
       clone_model_dynamics = update_module(
         clone_model_dynamics,
