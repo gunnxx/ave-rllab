@@ -1,82 +1,92 @@
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, Type
 
-import enum
-import functools
+import os
 import json
-import operator
+import gym
 
-class VERBOSE(enum.Enum):
-  SILENT = 1  # do not print anything
-  UNUSED = 2  # print only unused keys
-  ALL    = 3  # print unused and replaced keys
+import src.env
+import src.buffer as buffer
+import src.model as model
+from src.algo.algo import Algo
 
 class Config:
   """
-  Save all parameters passed.
-  These will be default values from REQUIRED_CONFIG_KEYS.
+  Notes:
+  Can't add additional keys besides what are specified
+  in the Algo.REQUIRED_CONFIG_KEYS.
   """
   def __init__(self,
-    verbose: VERBOSE = VERBOSE.UNUSED,
-    **kwargs) -> None:
-    self.config : Dict = dict()
-    self.verbose : VERBOSE = verbose
+    algo_cls: Type[Algo]) -> None:
+    self.algo_cls : Type[Algo] = algo_cls
+    self.data : Dict = algo_cls.REQUIRED_CONFIG_KEYS
 
-    for k, v in kwargs.items():
-      self.config[k] = v
+    ## Get the default params for model (algo-specific).
+    for k, v in algo_cls.MODEL_CONFIG_KEYS.items():
+      model_type = model.REGISTERED_MODEL[self.data[k]]
+      self.data[v] = model_type.REQUIRED_CONFIG_KEYS
+    
+    ## Get the default params for buffer (algo-specific).
+    for k, v in algo_cls.BUFFER_CONFIG_KEYS.items():
+      buffer_type = buffer.REGISTERED_BUFFER[self.data[k]]
+      self.data[v] = buffer_type.REQUIRED_CONFIG_KEYS
   
   """
-  "One-layer" overriding values of the config.
-  See set() to set value of a nested dictionary.
+  Override values of the config.
   """
-  def override_config(self, **kwargs) -> None:
+  def fill(self, **kwargs) -> None:
     for k, v in kwargs.items():
-      if k in self.config: # REPLACE
-        if self.verbose is VERBOSE.ALL:
-          print("{:10s} is replaced.".format(k))
-        self.config[k] = v
-      
-      else: # UNUSED
-        if self.verbose is VERBOSE.UNUSED or \
-            self.verbose is VERBOSE.ALL:
-          print("{:10s} is unused. Possible typo?".format(k))
+      print("Key:", k, "\tVal:", v)
+      self.set(k, v)
   
   """
-  "One-layer" overriding values of the config from JSON file.
+  Override values of the config from JSON file.
   """
-  def override_config_from_json(self, path: str) -> None:
+  def fill_from_json(self, path: str) -> None:
     with open(path) as json_file:
       data = json.load(json_file)
-      self.override_config(data)
+      self.fill(**data)
 
   """
   Save current configuration as JSON file.
   """
-  def save_config_as_json(self, path: str) -> None:
-    with open(path, 'w') as json_file:
-      json.dump(self.config, json_file)
-  
+  def save_as_json(self, path: str) -> None:
+    assert not os.path.isdir(path), """exp_dir exists! change the
+    exp_dir because we do not want to overwrite existing one."""
 
-  """
-  Set verbose to SILENT.
-  """
-  def silent(self) -> None:
-    self.verbose = VERBOSE.SILENT
+    os.makedirs(path)
+    file_path = os.path.join(path, "config.json")
+    with open(file_path, 'w') as json_file:
+      json.dump(self.data, json_file, indent=4)
   
   """
-  Allows to get values of a nested dictionary with list of keys.
+  Set only when the key matches with what's already in
+  the original config.
   """
-  def get(self, key: Union[str, List[str]]) -> Any:
-    if type(key) is List:
-      return functools.reduce(operator.getitem, key, self.config)
-    return self.config.get(key, None)
+  def set(self, key: str, val: Any) -> None:
+    if key in self.data:
+      self.data[key] = val
   
   """
-  Allows to set values of a nested dictionary with list of keys.
+  Map the non-json data-type.
   """
-  def set(self,
-    key: Union[str, List[str]],
-    val: Any) -> None:
-    if type(key) is List:
-      self.get(key[:-1])[key[-1]] = val
-    else:
-      self.config[key] = val
+  def prepare(self) -> None:
+    print(self.data["env"])
+    # env
+    self.set(
+      key="env",
+      val=gym.make(self.data["env"]))
+    
+    # logger
+
+
+    # buffer
+    for buffer_type_key in self.algo_cls.BUFFER_CONFIG_KEYS:
+      self.set(
+        key=buffer_type_key,
+        val=buffer.REGISTERED_BUFFER[self.data[buffer_type_key]])
+    
+    # model
+    for model_type_key in self.algo_cls.MODEL_CONFIG_KEYS:
+      self.set(
+        key=model_type_key,
+        val=model.REGISTERED_MODEL[self.data[model_type_key]])

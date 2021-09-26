@@ -4,8 +4,6 @@ import torch
 import torch.nn as nn
 import numpy as np
 
-from src.config import Config
-
 """
 """
 def create_mlp(
@@ -42,11 +40,3 @@ def batch_data(*args):
   for d in args:
     data.append(torch.unsqueeze(d, dim=0))
   return torch.cat(data)
-
-"""
-"""
-def check_config_keys(
-  config: Config,
-  required_config_keys: List[str]) -> None:
-  for key in required_config_keys:
-    assert key in config, "{} is not present in the config".format(key)
