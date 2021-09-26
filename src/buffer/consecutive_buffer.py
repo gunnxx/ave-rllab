@@ -10,7 +10,7 @@ class ConsecutiveBuffer(Buffer):
   # List of constructor parameters
   # This will be used to check config in run.py
   REQUIRED_CONFIG_KEYS = {
-    "buffer_size": 1e4,
+    "buffer_size": int(1e4),
     "consecutive_size": 20
   }
 
