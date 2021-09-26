@@ -7,12 +7,13 @@ import torch.optim as optim
 
 from learn2learn import clone_module, update_module
 
+from src.algo.algo import Algo, REGISTERED_OPTIM
 from src.buffer.consecutive_buffer import ConsecutiveBuffer
 from src.model.stochastic_model import StochasticModel
 from src.utils.logger import Logger
 from src.utils.common import cast_to_torch
 
-class GrBAL:
+class GrBAL(Algo):
   # List of constructor parameters
   # This will be used to check config in run.py
   REQUIRED_CONFIG_KEYS = {
@@ -32,10 +33,10 @@ class GrBAL:
     "meta_optimizer_type": "adam",
     "meta_optimizer_params": {},
     "num_inner_grad_steps": 1,
-    "num_past_obs": 16,
-    "num_future_obs": 10,
+    "num_past_obs": 15,
+    "num_future_obs": 5,
     "task_sampling_freq": 1,
-    "planning_horizon": 8,
+    "planning_horizon": 4,
     "n_trajectory": 256,
     "is_first_order": True,
     "is_nested_grad": False
@@ -50,12 +51,6 @@ class GrBAL:
   BUFFER_CONFIG_KEYS = {
     "buffer_type": "buffer_params"
   }
-
-  # Part of REQUIRED_CONFIG_KEYS to instantiate optimizer
-  OPTIMIZER_CONFIG_KEYS = {
-    "meta_optimizer_type": "meta_optimizer_params"
-  }
-
 
   """
   params:
@@ -135,7 +130,7 @@ class GrBAL:
     model_dynamics_params: Dict,
     buffer_type: Type[ConsecutiveBuffer],
     buffer_params: Dict,
-    meta_optimizer_type: Type[optim.Optimizer],
+    meta_optimizer_type: str,
     meta_optimizer_params: Dict,
     num_inner_grad_steps: int,
     num_past_obs: int,
@@ -183,8 +178,8 @@ class GrBAL:
       buffer_params)
     
     # instantiate optimizer for meta-update
-    self.meta_optimizer : optim.Optimizer = \
-      meta_optimizer_type(
+    optim_type = REGISTERED_OPTIM[meta_optimizer_type]
+    self.meta_optimizer : optim.Optimizer = optim_type(
       self.model_dynamics.parameters(),
       **meta_optimizer_params)
 
@@ -193,17 +188,27 @@ class GrBAL:
   """
   @staticmethod
   def validate_params(params: Dict) -> None:
-    assert params["planning_horizon"] < params["num_future_obs"], "Planning \
-      horizon should be less than adaptation horizon to better capture local \
-      context."
+    assert params["planning_horizon"] < params["num_future_obs"], \
+    """Planning horizon should be less than adaptation horizon to
+    better capture local context."""
 
-    assert params["num_collection_steps"] >= params["num_past_obs"] + \
-      params["num_future_obs"], "Collection steps should be greater than the \
-        consecutive_size of the buffer. It needs to at least store one entry \
-        in the buffer."
+    assert params["num_collection_steps"] >= params["num_past_obs"] \
+    + params["num_future_obs"], """Collection steps should be greater
+    than the consecutive_size of the buffer. It needs to at least
+    store one entry in the buffer."""
     
     assert params["num_past_obs"] + params["num_future_obs"] == \
-      params["buffer_params"]["consecutive_size"]
+    params["buffer_params"]["consecutive_size"], """This should match
+    because this chunk is considered as one situation."""
+    
+    assert params["env"].action_space.shape[0] + \
+    params["env"].observation_space.shape[0] == \
+    params["model_dynamics_params"]["input_dim"], """Input to the
+    network is action and state tuple."""
+    
+    assert params["env"].observation_space.shape[0] == \
+    params["model_dynamics_params"]["output_dim"], """Output of the
+    network is the next state."""
   
   
   """
