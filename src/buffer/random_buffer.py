@@ -1,4 +1,3 @@
-from src.utils.common import cast_to_torch
 from typing import Dict
 
 import torch
@@ -11,13 +10,16 @@ class RandomBuffer(Buffer):
   # List of constructor parameters
   # This will be used to check config in run.py
   REQUIRED_CONFIG_KEYS = {
-    "buffer_size": 1e4
+    "buffer_size": int(1e4),
+    "device": "cpu"
   }
 
   """
   """
-  def __init__(self, buffer_size: int) -> None:
-    super().__init__(buffer_size)
+  def __init__(self,
+    buffer_size: int,
+    device: str) -> None:
+    super().__init__(buffer_size, device)
   
   """
   """
@@ -29,7 +31,7 @@ class RandomBuffer(Buffer):
   """
   def _store_mechanism(self, **kwargs) -> None:
     for k in self.data_keys:
-      v = cast_to_torch(kwargs[k], torch.float32)
+      v = cast_to_torch(kwargs[k], torch.float32, self.device)
 
       try:
         self.data[k][self.ptr] = v

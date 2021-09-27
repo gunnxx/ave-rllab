@@ -9,18 +9,19 @@ def test_init_from_classmethod():
   # expected to raise an assertion
   with pytest.raises(AssertionError):
     _ = ConsecutiveBuffer.instantiate_buffer(
-      {"buffer_size": 1, "consecutive_size": 2})
+      {"buffer_size": 1, "consecutive_size": 2, "device": "cpu"})
   
   # expected to success
   _ = ConsecutiveBuffer.instantiate_buffer(
-    {"buffer_size": 1, "consecutive_size": 1})
+    {"buffer_size": 1, "consecutive_size": 1, "device": "cpu"})
 
 
 def test_method_init_buffer():
   buffer_size = 3
   consecutive_size = 1
+  device = "cpu"
   
-  buffer = ConsecutiveBuffer(buffer_size, consecutive_size)
+  buffer = ConsecutiveBuffer(buffer_size, consecutive_size, device)
   
   # _init_buffer() is called during the first call of store()
   buffer.store(
@@ -39,8 +40,9 @@ def test_method_init_buffer():
 def test_method_store():
   buffer_size = 3
   consecutive_size = 2
+  device = "cpu"
   
-  buffer = ConsecutiveBuffer(buffer_size, consecutive_size)
+  buffer = ConsecutiveBuffer(buffer_size, consecutive_size, device)
 
   # because consecutive_size = 2, the actual storing
   # operation starts at the 2-nd call of store()
@@ -62,8 +64,9 @@ def test_method_store():
 def test_method_sample():
   buffer_size = 5
   consecutive_size = 3
+  device = "cpu"
   
-  buffer = ConsecutiveBuffer(buffer_size, consecutive_size)
+  buffer = ConsecutiveBuffer(buffer_size, consecutive_size, device)
   
   for _ in range(buffer_size + consecutive_size - 1):
     buffer.store(key_1=torch.randn(2, 3))
@@ -83,8 +86,9 @@ def test_method_sample():
 def test_condition_circular_when_full_buffer():
   buffer_size = 5
   consecutive_size = 2
+  device = "cpu"
   
-  buffer = ConsecutiveBuffer(buffer_size, consecutive_size)
+  buffer = ConsecutiveBuffer(buffer_size, consecutive_size, device)
 
   # full capacity
   data = []

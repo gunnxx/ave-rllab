@@ -8,15 +8,18 @@ from src.utils.common import batch_data
 def test_init_from_classmethod():
   # expected to raise an assertion
   with pytest.raises(AssertionError):
-    _ = RandomBuffer.instantiate_buffer({"buffer_size": 0})
+    _ = RandomBuffer.instantiate_buffer(
+      {"buffer_size": 0, "device": "cpu"})
   
   # expected to success
-  _ = RandomBuffer.instantiate_buffer({"buffer_size": 1})
+  _ = RandomBuffer.instantiate_buffer(
+    {"buffer_size": 1, "device": "cpu"})
 
 
 def test_method_init_buffer():
   buffer_size = 3
-  buffer = RandomBuffer(buffer_size)
+  device = "cpu"
+  buffer = RandomBuffer(buffer_size, device)
 
   # _init_buffer() is called during the first call of store()
   buffer.store(
@@ -34,7 +37,8 @@ def test_method_init_buffer():
 
 def test_method_store():
   buffer_size = 2
-  buffer = RandomBuffer(buffer_size)
+  device = "cpu"
+  buffer = RandomBuffer(buffer_size, device)
 
   assert buffer.size == 0
   assert buffer.ptr  == 0
@@ -52,7 +56,8 @@ def test_method_store():
 
 def test_method_sample():
   buffer_size = 6
-  buffer = RandomBuffer(buffer_size)
+  device = "cpu"
+  buffer = RandomBuffer(buffer_size, device)
 
   for _ in range(buffer_size):
     buffer.store(data=torch.randn(2, 3))
@@ -68,7 +73,8 @@ def test_method_sample():
 
 def test_condition_circular_when_full_buffer():
   buffer_size = 6
-  buffer = RandomBuffer(6)
+  device = "cpu"
+  buffer = RandomBuffer(buffer_size, device)
 
   # full capacity
   data = []

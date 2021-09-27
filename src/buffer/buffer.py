@@ -7,22 +7,26 @@ from src.utils.common import cast_to_torch
 class Buffer:
   """
   """
-  def __init__(self, buffer_size: int) -> None:
+  def __init__(self,
+    buffer_size: int,
+    device: str) -> None:
     self.max_size : int = buffer_size
     self.ptr : int = 0
     self.size : int = 0
     
     self.data : Dict[str, torch.Tensor] = dict()
     self.data_keys : List[str] = list()
+    
+    self.device : torch.device = torch.device(device)
 
   """
   """
   def _init_buffer(self, **kwargs) -> None:
     for k, v in kwargs.items():
-      v = cast_to_torch(v, dtype=torch.float32)
+      v = cast_to_torch(v, torch.float32, self.device)
       self.data[k] = torch.zeros(
         (self.max_size, *v.shape),
-        dtype=torch.float32)
+        dtype=torch.float32).to(self.device)
       
       self.data_keys.append(k)
 

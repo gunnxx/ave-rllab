@@ -11,15 +11,17 @@ class ConsecutiveBuffer(Buffer):
   # This will be used to check config in run.py
   REQUIRED_CONFIG_KEYS = {
     "buffer_size": int(1e4),
-    "consecutive_size": 20
+    "consecutive_size": 20,
+    "device": "cpu"
   }
 
   """
   """
   def __init__(self,
     buffer_size: int,
-    consecutive_size: int) -> None:
-    super().__init__(buffer_size)
+    consecutive_size: int,
+    device: str) -> None:
+    super().__init__(buffer_size, device)
 
     self.queue : Dict[str, List[torch.Tensor]] = {}
     self.consecutive_size : int = consecutive_size
@@ -35,11 +37,11 @@ class ConsecutiveBuffer(Buffer):
   """
   def _init_buffer(self, **kwargs) -> None:
     for k, v in kwargs.items():
-      v = cast_to_torch(v, torch.float32)
+      v = cast_to_torch(v, torch.float32, self.device)
 
       self.data[k] = torch.zeros(
         (self.max_size, self.consecutive_size, *v.shape),
-        dtype=torch.float32)
+        dtype=torch.float32).to(self.device)
       
       self.queue[k] = []
       self.data_keys.append(k)
@@ -49,7 +51,7 @@ class ConsecutiveBuffer(Buffer):
   def _store_mechanism(self, **kwargs) -> None:
     for k in self.data_keys:
       # single value
-      v = cast_to_torch(kwargs[k], torch.float32)
+      v = cast_to_torch(kwargs[k], torch.float32, self.device)
 
       # put it on queue to join it with previous values
       self.queue[k].append(torch.unsqueeze(v, dim=0))

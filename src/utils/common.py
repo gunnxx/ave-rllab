@@ -23,15 +23,16 @@ def create_mlp(
 """
 def cast_to_torch(
   data: Union[torch.Tensor, np.array],
-  dtype: torch.dtype) -> torch.Tensor:
+  dtype: torch.dtype,
+  device: torch.device) -> torch.Tensor:
   
   if type(data) is not torch.Tensor:
-    return torch.tensor(data, dtype=dtype)
+    return torch.tensor(data, dtype=dtype, device=device)
   
   elif data.dtype is not dtype:
-    return data.type(dtype)
+    return data.type(dtype).to(device)
   
-  return data
+  return data.to(device)
 
 """
 """
