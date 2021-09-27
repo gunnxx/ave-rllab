@@ -3,6 +3,15 @@ import argparse
 import src.algo as algo
 from src.config import Config
 
+## parse to int/float/str
+def auto_parse(data):
+  if type(data) == str:
+    try: return int(data)
+    except ValueError:
+      try: return float(data)
+      except ValueError: return data
+  return data
+
 def main(args):
   algo_class = algo.REGISTERED_ALGO[args.algo]
   
@@ -35,7 +44,7 @@ if __name__ == '__main__':
   # algo-specific args
   for keyword in other_args:
     if keyword.startswith('--'):
-      parser.add_argument(keyword.split('=')[0])
+      parser.add_argument(keyword.split('=')[0], type=auto_parse)
   
   args = parser.parse_args()
 

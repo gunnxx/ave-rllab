@@ -35,7 +35,6 @@ class Config:
   """
   def fill(self, **kwargs) -> None:
     for k, v in kwargs.items():
-      print("Key:", k, "\tVal:", v)
       self.set(k, v)
   
   """
@@ -70,7 +69,6 @@ class Config:
   Map the non-json data-type.
   """
   def prepare(self) -> None:
-    print(self.data["env"])
     # env
     self.set(
       key="env",
