@@ -2,6 +2,7 @@ from typing import Dict, List, Tuple, Union
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from torch.distributions import \
   Distribution, Normal, Independent, TransformedDistribution
 from torch.distributions.transforms import \
@@ -60,14 +61,17 @@ class GaussianMLPModel(StochasticModel):
     assert len(params["hidden_size"]) >= 0
 
   """
+  Needs to make sure that `std > 0`.
+  Passing the output of `log_std_layer` to `exp()` is not enough
+  because sometimes `exp()` outputs zero e.g. for input -300.
+  The downside is that the `std` is lower-bounded by `exp(0)`.
   """
   def _distribution(self,
     x: torch.Tensor) -> Distribution:
     base_net_out = self.base_net(x)
 
     mu = self.mu_layer(base_net_out)
-    std = torch.exp(self.log_std_layer(base_net_out))
-
+    std = torch.exp(F.softplus(self.log_std_layer(base_net_out)))
     dist = Independent(Normal(mu, std), 1)
     return TransformedDistribution(dist, self.transforms)
 

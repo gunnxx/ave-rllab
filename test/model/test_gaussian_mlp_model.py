@@ -51,7 +51,7 @@ def test_method_distribution():
 
 def test_method_forward():
   # sometimes life hits you with nan and inf
-  torch.manual_seed(10)
+  # torch.manual_seed(10)
 
   input_dim = 8
   output_dim = 16
