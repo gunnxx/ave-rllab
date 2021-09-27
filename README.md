@@ -1,3 +1,6 @@
+## Dependencies
+- [pybulletgym](https://github.com/benelot/pybullet-gym)
+
 ## Style and API checklist
 - Type-hint for every variables in constructor.
 - `REQUIRED_CONFIG_KEYS: Dict[str, Any]` is required for every non-abstract classes where the values are the exact copy of the constructor parameters. It is needed to populate the `Config` for missing values with default values.
@@ -7,7 +10,7 @@
 - After creating non-abstract class, dont forget to register on the module's `__init__.py`.
 
 ## (Algorithm) to dos:
-- [ ] `GrBAL` (original, nested, and first-order)
+- [x] `GrBAL` (original, nested, and first-order)
 - [ ] `FAMLE`
 - [ ] `MAML + On-Policy RL`
 - [ ] `ReBAL`
