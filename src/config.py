@@ -59,11 +59,17 @@ class Config:
   
   """
   Set only when the key matches with what's already in
-  the original config.
+  the original config. Use `.` (dot) to set nested dictionary.
   """
   def set(self, key: str, val: Any) -> None:
-    if key in self.data:
-      self.data[key] = val
+    temp = self.data
+    key = key.split(".")
+
+    for k in key[:-1]:
+      if k in temp: temp = temp[k]
+    
+    if key[-1] in temp:
+      temp[key[-1]] = val
   
   """
   Map the non-json data-type.

@@ -18,6 +18,7 @@ class GrBAL(Algo):
   # This will be used to check config in run.py
   REQUIRED_CONFIG_KEYS = {
     "env": None,
+    "device": "cpu",
     "logger": None,
     "batch_size": 8,
     "task_learning_rate": 1e-3,
@@ -56,6 +57,8 @@ class GrBAL(Algo):
   params:
     env:
       environment object used
+    device:
+      device used
     logger:
       logger object
     batch_size:
@@ -118,6 +121,7 @@ class GrBAL(Algo):
   """
   def __init__(self,
     env: gym.Env,
+    device: str,
     logger: Logger,
     batch_size: int,
     task_learning_rate: float,
@@ -142,6 +146,7 @@ class GrBAL(Algo):
     is_nested_grad: bool) -> None:
 
     self.env : gym.Env = env
+    self.device : torch.device = torch.device(device)
     self.logger : Logger = logger
 
     # general training optimization hyperparams
@@ -170,7 +175,7 @@ class GrBAL(Algo):
     # instantiate learnable model dynamics
     self.model_dynamics: StochasticModel = \
       model_dynamics_type.instantiate_model(
-      model_dynamics_params)
+      model_dynamics_params).to(self.device)
 
     # instantiate replay buffer
     self.buffer: ConsecutiveBuffer = \
@@ -324,19 +329,20 @@ class GrBAL(Algo):
   def _random_shooting_controller(self,
     model: StochasticModel,
     n_trajectory: int,
-    curr_obs: np.ndarray) -> np.ndarray:
+    curr_obs: np.ndarray) -> torch.Tensor:
     # initialize reward
-    rewards = torch.zeros(n_trajectory)
+    rewards = torch.zeros(n_trajectory).to(self.device)
 
     # sample actions uniformly
     act_dim  = self.env.action_space.shape[0]
     act_low  = self.env.action_space.low[0]
     act_high = self.env.action_space.high[0]
-    act = torch.rand(self.planning_horizon, n_trajectory, act_dim)
+    act_shape = (self.planning_horizon, n_trajectory, act_dim)
+    act = torch.rand(*act_shape).to(self.device)
     act = (act_low - act_high) * act + act_high
 
     # from (obs_dim) to (n_trajectory, obs_dim)
-    curr_obs = cast_to_torch(curr_obs, dtype=torch.float32)
+    curr_obs = cast_to_torch(curr_obs, torch.float32, self.device)
     curr_obs = curr_obs.unsqueeze(dim=0).repeat(n_trajectory, 1)
 
     '''
@@ -349,12 +355,12 @@ class GrBAL(Algo):
     ## reward = new_potential - old_potential
     ## potential = -L2 distance to target
     if self.env.spec.id == 'BrokenReacherPyBulletEnv-v0':
-      old_potential = -np.linalg.norm(curr_obs[:, 2:3], axis=1)
+      old_potential = -torch.linalg.norm(curr_obs[:, 2:3], dim=1)
 
     ## reward = speed towards x-axis (vx_body * cos angle_to_target)
     ## potential = 0, recording potential just to unify the API later
     elif self.env.spec.id == 'BrokenAntPyBulletEnv-v0':
-      old_potential = 0
+      old_potential = torch.tensor(0, torch.float32, self.device)
 
     else:
         raise NotImplementedError("Reward func is hard-coded, \
@@ -375,7 +381,7 @@ class GrBAL(Algo):
       of the environment whose parameter is current_obs.
       '''
       if self.env.spec.id == 'BrokenReacherPyBulletEnv-v0':
-        potential = -np.linalg.norm(next_obs[:, 2:3], axis=1)
+        potential = -torch.linalg.norm(next_obs[:, 2:3], dim=1)
         reward = potential - old_potential
         old_potential = potential
       
@@ -389,7 +395,7 @@ class GrBAL(Algo):
     
     # choose the first action of the best trajectory
     best_idx = torch.argmax(rewards)
-    return act[0, best_idx, :].numpy()
+    return act[0, best_idx, :]
 
   
   """

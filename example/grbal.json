@@ -1,5 +1,6 @@
 {
     "env": "BrokenReacherPyBulletEnv-v0",
+    "device": "cpu",
     "logger": null,
     "batch_size": 8,
     "task_learning_rate": 0.001,
@@ -21,7 +22,8 @@
     "buffer_type": "consecutive_buffer",
     "buffer_params": {
         "buffer_size": 10000,
-        "consecutive_size": 20
+        "consecutive_size": 20,
+        "device": "cpu"
     },
     "meta_optimizer_type": "adam",
     "meta_optimizer_params": {},
