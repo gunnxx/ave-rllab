@@ -1,17 +1,21 @@
 from typing import Dict, Type
 
+import copy
+import json
 import gym
 import numpy as np
 import torch
 import torch.optim as optim
 
+from tqdm import tqdm
 from learn2learn import clone_module, update_module
 
 from src.algo.algo import Algo, REGISTERED_OPTIM
 from src.buffer.consecutive_buffer import ConsecutiveBuffer
 from src.model.stochastic_model import StochasticModel
-from src.utils.logger import Logger
 from src.utils.common import cast_to_torch
+from src.utils.logger import Logger
+from src.utils.timer import Timer
 
 class GrBAL(Algo):
   # List of constructor parameters
@@ -19,12 +23,13 @@ class GrBAL(Algo):
   REQUIRED_CONFIG_KEYS = {
     "env": None,
     "device": "cpu",
-    "logger": None,
+    "seed": 1501,
+    "exp_dir": "exp/grbal",
     "batch_size": 8,
     "task_learning_rate": 1e-3,
     "training_epoch": 32,
     "num_collection_steps": 1000,
-    "testing_episode": None,
+    "testing_episode": 5,
     "max_episode_length": 1000,
     "policy_start_steps": 1000,
     "model_dynamics_type": "gaussian_mlp_model",
@@ -37,6 +42,8 @@ class GrBAL(Algo):
     "num_past_obs": 15,
     "num_future_obs": 5,
     "task_sampling_freq": 1,
+    "model_save_freq": 1,
+    "render_freq": 5,
     "planning_horizon": 4,
     "n_trajectory": 256,
     "is_first_order": True,
@@ -59,8 +66,10 @@ class GrBAL(Algo):
       environment object used
     device:
       device used
-    logger:
-      logger object
+    seed:
+      seed value for (reproducible) randomness
+    exp_dir:
+      directory to save the log files
     batch_size:
       number of tasks used for MAML
     task_learning_rate:
@@ -103,6 +112,11 @@ class GrBAL(Algo):
     task_sampling_freq:
       how often to collect trajectories i.e.
       `epoch % task_sampling_freq == 0`
+    model_save_freq:
+      how often to save the model i.e.
+      `epoch % model_save_freq == 0`
+    render_freq:
+      how often to render the agent during testing
     planning_horizon:
       horizon used for MPC i.e. random-shooting
     n_trajectory:
@@ -122,7 +136,8 @@ class GrBAL(Algo):
   def __init__(self,
     env: gym.Env,
     device: str,
-    logger: Logger,
+    seed: int,
+    exp_dir: str,
     batch_size: int,
     task_learning_rate: float,
     training_epoch: int,
@@ -140,14 +155,21 @@ class GrBAL(Algo):
     num_past_obs: int,
     num_future_obs: int,
     task_sampling_freq: int,
+    model_save_freq: int,
+    render_freq: int,
     planning_horizon: int,
     n_trajectory: int,
     is_first_order: bool,
     is_nested_grad: bool) -> None:
 
     self.env : gym.Env = env
+    self.test_env: gym.Env = copy.deepcopy(self.env)
     self.device : torch.device = torch.device(device)
-    self.logger : Logger = logger
+    self.logger : Logger = Logger(exp_dir)
+
+    ## set the random seed
+    torch.manual_seed(seed)
+    np.random.seed(seed)
 
     # general training optimization hyperparams
     self.batch_size : int = batch_size
@@ -159,6 +181,8 @@ class GrBAL(Algo):
     self.testing_episode : int = testing_episode
     self.max_episode_length : int = max_episode_length
     self.policy_start_steps : int = policy_start_steps
+    self.model_save_freq : int = model_save_freq
+    self.render_freq : int = render_freq
 
     # meta-learning and adaptation hyperparams
     self.num_inner_grad_steps : int = num_inner_grad_steps
@@ -240,12 +264,12 @@ class GrBAL(Algo):
       # whether nested-MAML, orig-MAML, or fo-MAML
       if self.is_nested_grad:
         grad = torch.autograd.grad(
-          -log_prob_model.sum(),
+          -log_prob_model.mean(),
           self.model_dynamics.parameters(),
           create_graph=(not self.is_first_order))
       else:
         grad = torch.autograd.grad(
-          -log_prob_model.sum(),
+          -log_prob_model.mean(),
           clone_model_dynamics.parameters(),
           create_graph=(not self.is_first_order))
       
@@ -294,12 +318,12 @@ class GrBAL(Algo):
         # whether nested-MAML, orig-MAML, or fo-MAML
         if self.is_nested_grad:
           grad = torch.autograd.grad(
-            -log_prob_model.sum(),
+            -log_prob_model.mean(),
             self.model_dynamics.parameters(),
             create_graph=(not self.is_first_order))
         else:
           grad = torch.autograd.grad(
-            -log_prob_model.sum(),
+            -log_prob_model.mean(),
             clone_model_dynamics.parameters(),
             create_graph=(not self.is_first_order))
         
@@ -313,8 +337,10 @@ class GrBAL(Algo):
         next_obs_query[i])
       
       grad = torch.autograd.grad(
-        -log_prob_model.sum(),
+        -log_prob_model.mean(),
         self.model_dynamics.parameters())
+      
+      self.logger.epoch_store(loss=-log_prob_model.mean().item())
       
       meta_grads = tuple(mg + g for mg, g in zip(meta_grads, grad))
     
@@ -323,7 +349,7 @@ class GrBAL(Algo):
       p.grad = mg/self.batch_size
     self.meta_optimizer.step()
   
-  
+
   """
   """
   def _random_shooting_controller(self,
@@ -363,8 +389,8 @@ class GrBAL(Algo):
       old_potential = torch.tensor(0, torch.float32, self.device)
 
     else:
-        raise NotImplementedError("Reward func is hard-coded, \
-          choose only the listed environments on src/env")
+      raise NotImplementedError("""Reward func is hard-coded,
+      choose only the listed environments on src/env""")
 
     # rollout the sampled action
     for i in range(self.planning_horizon):
@@ -401,25 +427,28 @@ class GrBAL(Algo):
   """
   """
   def run(self) -> None:
-    t = 0
-    for epoch in range(self.training_epoch):
+    timer, t = Timer(), 0
+    
+    obs = self.env.reset()
+    episode_ret = 0
+    episode_len = 0
+
+    for epoch in tqdm(range(self.training_epoch)):
+      timer.reset()
+
       ##########################
       ## COLLECT TRAJECTORIES ##
       ##########################
       if epoch % self.task_sampling_freq == 0:
-        obs = self.env.reset()
-        episode_ret = 0
-        episode_len = 0
-
         for _ in range(self.num_collection_steps):
           # start with random policy,
           # model-based planning afterwards
           if t < self.policy_start_steps:
             act = self.env.action_space.sample()
           else:
-            adapted_model = self._model_online_adaptation()
             act = self._random_shooting_controller(
-              adapted_model, self.n_trajectory, obs)
+              self._model_online_adaptation(),
+              self.n_trajectory, obs)
           
           # step in the environment
           next_obs, rew, done, info = self.env.step(act)
@@ -440,6 +469,17 @@ class GrBAL(Algo):
 
           # handle end of trajectory
           if done or success or episode_len == self.max_episode_length:
+            self.logger.epoch_store(
+              training_episode_ret=episode_ret,
+              training_episode_len=episode_len
+            )
+            self.logger.store(training={
+              "episode_ret": episode_ret,
+              "episode_len": episode_len,
+              "epoch": epoch,
+              "t": t
+            })
+
             obs = self.env.reset()
             episode_ret = 0
             episode_len = 0
@@ -448,3 +488,71 @@ class GrBAL(Algo):
       ## META-LEARN ##
       ################
       self._model_meta_learn()
+
+      #####################
+      ## TEST AND RENDER ##
+      #####################
+      for _ in range(self.testing_episode):
+        _obs = self.test_env.reset()
+        _episode_ret = 0
+        _episode_len = 0
+
+        while(True):
+          _act = self._random_shooting_controller(
+            self._model_online_adaptation(),
+            self.n_trajectory, _obs)
+          
+          # step in the environment
+          _next_obs, _rew, _done, _info = self.test_env.step(_act)
+          _success = _info.get('is_success', False)
+          
+          # update values
+          _obs = _next_obs
+          _episode_ret += _rew
+          _episode_len += 1
+
+          # handle end of trajectory
+          if _done or \
+             _success or \
+             _episode_len == self.max_episode_length:
+            self.logger.epoch_store(
+              testing_episode_ret=_episode_ret,
+              testing_episode_len=_episode_len
+            )
+            break
+
+      ##################
+      ## END OF EPOCH ##
+      ##################
+      self.logger.epoch_store(
+        epoch=epoch,
+        time_elapsed=timer.elapsed()
+      )
+
+      # saving
+      if epoch % self.model_save_freq == 0 or \
+         epoch == self.training_epoch - 1:
+        self.logger.torch_save({
+          "epoch": epoch,
+          "model_dict": self.model_dynamics.state_dict(),
+          "optim_dict": self.meta_optimizer.state_dict(),
+          "buffer_obj": self.buffer,
+          "env_obj": self.env
+        }, "chkpt.%03d.pt" % epoch)
+      
+      # logging and printing
+      # json.dumps() to pretty print dict
+      epoch_stat = self.logger.dump()
+      print_keys = [
+        "training_episode_ret-avg",
+        "training_episode_len-avg",
+        "loss-avg",
+        "testing_episode_ret-avg",
+        "testing_episode_len-avg",
+        "time-elapsed"]
+      tqdm.write(json.dumps(
+        {k: v for k, v in epoch_stat.items() if k in print_keys},
+        indent=2
+      ))
+
+    self.logger.close()

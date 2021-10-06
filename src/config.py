@@ -80,9 +80,6 @@ class Config:
       key="env",
       val=gym.make(self.data["env"]))
     
-    # logger
-
-
     # buffer
     for buffer_type_key in self.algo_cls.BUFFER_CONFIG_KEYS:
       self.set(
