@@ -1,8 +1,11 @@
-from typing import Dict, List, Type, Union
+from typing import Dict, List, Tuple, Type, Union
 
 import torch
 import torch.nn as nn
 import numpy as np
+
+from PIL import Image
+from PIL.ImageDraw import Draw
 
 """
 """
@@ -41,3 +44,22 @@ def batch_data(*args):
   for d in args:
     data.append(torch.unsqueeze(d, dim=0))
   return torch.cat(data)
+
+"""
+"""
+def label_frame(
+  frame: np.ndarray,
+  text_color: Tuple[int] = (0, 0, 0),
+  **kwargs) -> Image.Image:
+  im = Image.fromarray(frame)
+  drawer = Draw(im)
+  
+  x_loc = im.size[0]/20
+  y_loc = im.size[1]/10
+
+  for k, v in kwargs.items():
+    text = str(k) + " : " + str(v)
+    drawer.text((x_loc, y_loc), text, fill=text_color)
+    y_loc += 15
+  
+  return im

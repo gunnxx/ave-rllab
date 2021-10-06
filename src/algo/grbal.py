@@ -1,7 +1,6 @@
 from typing import Dict, Type
 
-import copy
-import json
+import copy, imageio, json, os
 import gym
 import numpy as np
 import torch
@@ -13,7 +12,7 @@ from learn2learn import clone_module, update_module
 from src.algo.algo import Algo, REGISTERED_OPTIM
 from src.buffer.consecutive_buffer import ConsecutiveBuffer
 from src.model.stochastic_model import StochasticModel
-from src.utils.common import cast_to_torch
+from src.utils.common import cast_to_torch, label_frame
 from src.utils.logger import Logger
 from src.utils.timer import Timer
 
@@ -167,9 +166,15 @@ class GrBAL(Algo):
     self.device : torch.device = torch.device(device)
     self.logger : Logger = Logger(exp_dir)
 
+    ### TEMPORARY ###
+    os.makedirs(os.path.join(exp_dir, "gifs"))
+    self.gif_path : str = os.path.join(exp_dir, "gifs")
+
     ## set the random seed
     torch.manual_seed(seed)
     np.random.seed(seed)
+    self.env.seed(seed)
+    self.test_env.seed(seed)
 
     # general training optimization hyperparams
     self.batch_size : int = batch_size
@@ -492,11 +497,23 @@ class GrBAL(Algo):
       #####################
       ## TEST AND RENDER ##
       #####################
-      for _ in range(self.testing_episode):
+      for i in range(self.testing_episode):
+        # episode testing purpose
         _obs = self.test_env.reset()
         _episode_ret = 0
         _episode_len = 0
 
+        # rendering purpose
+        frames = []
+        do_render = epoch % self.render_freq == 0 or \
+          epoch == self.training_epoch
+        
+        if do_render:
+          frame = self.test_env.render(mode="rgb_array")
+          frames.append(label_frame(frame, epoch=epoch,
+            ret=_episode_ret, len=_episode_len))
+        
+        # testing episode loop
         while(True):
           _act = self._random_shooting_controller(
             self._model_online_adaptation(),
@@ -506,6 +523,12 @@ class GrBAL(Algo):
           _next_obs, _rew, _done, _info = self.test_env.step(_act)
           _success = _info.get('is_success', False)
           
+          # render
+          if do_render:
+            frame = self.test_env.render(mode="rgb_array")
+            frames.append(label_frame(frame, epoch=epoch,
+              ret=_episode_ret, len=_episode_len))
+
           # update values
           _obs = _next_obs
           _episode_ret += _rew
@@ -520,6 +543,11 @@ class GrBAL(Algo):
               testing_episode_len=_episode_len
             )
             break
+        
+        if do_render:
+          imageio.mimwrite(os.path.join(
+            self.gif_path, "epoch%03d.%d.gif" % (epoch, i)),
+            frames, fps=30)
 
       ##################
       ## END OF EPOCH ##
@@ -549,7 +577,7 @@ class GrBAL(Algo):
         "loss-avg",
         "testing_episode_ret-avg",
         "testing_episode_len-avg",
-        "time-elapsed"]
+        "time_elapsed"]
       tqdm.write(json.dumps(
         {k: v for k, v in epoch_stat.items() if k in print_keys},
         indent=2
