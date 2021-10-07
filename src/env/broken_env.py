@@ -1,6 +1,7 @@
-from typing import List
+from typing import List, Union
 
 import numpy as np
+import torch
 
 class BrokenEnv:
   """
@@ -98,7 +99,9 @@ class BrokenEnv:
   
   """
   """
-  def apply_damage(self, a: np.ndarray) -> np.ndarray:
+  def apply_damage(self,
+    a: Union[torch.Tensor, np.ndarray]) -> np.ndarray:
     act_modifier = np.array([-1 if i else 1 for i in self.reversed_polarity])
     act_modifier = act_modifier * self.weakened_actuator
+    if type(a) == torch.Tensor: a = a.cpu().numpy()
     return a * act_modifier
