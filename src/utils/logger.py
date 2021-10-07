@@ -1,8 +1,9 @@
 from typing import Any, Dict, List
 
-import os
+import imageio, os
 import numpy as np
 import torch
+from PIL.Image import Image
 
 class Logger:
   """
@@ -38,6 +39,7 @@ class Logger:
     spacing: int = 15,
     float_precision: int = 6) -> None:
     os.makedirs(os.path.join(exp_dir, "torch"))
+    os.makedirs(os.path.join(exp_dir, "gifs"))
 
     self.exp_dir = exp_dir
     self.spacing = spacing
@@ -174,6 +176,17 @@ class Logger:
       objects,
       os.path.join(self.exp_dir, "torch", filename))
   
+  """
+  For convenience, just like `self.torch_save()`.
+  """
+  def save_as_gif(self,
+    frames: List[Image],
+    filename: str,
+    fps: int) -> None:
+    imageio.mimwrite(
+      os.path.join(self.exp_dir, "gifs", filename),
+      frames, fps=fps)
+
   """
   Close all files and generate plot from dumped
   `self.log` and `self.epoch_log` if needed.

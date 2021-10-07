@@ -3,19 +3,19 @@
     "device": "cpu",
     "seed": 1501,
     "exp_dir": "exp/grbal",
-    "batch_size": 8,
-    "task_learning_rate": 0.001,
-    "training_epoch": 32,
-    "num_collection_steps": 1000,
-    "testing_episode": 5,
-    "max_episode_length": 1000,
-    "policy_start_steps": 1000,
+    "batch_size": 16,
+    "task_learning_rate": 0.0005,
+    "training_epoch": 100,
+    "num_collection_steps": 1500,
+    "testing_episode": 3,
+    "max_episode_length": 150,
+    "policy_start_steps": 1500,
     "model_dynamics_type": "gaussian_mlp_model",
     "model_dynamics_params": {
         "input_dim": 11,
         "output_dim": 9,
         "hidden_size": [
-            128
+            128, 128
         ],
         "activation": "relu",
         "sample_scaling": null
@@ -32,10 +32,9 @@
     "num_past_obs": 15,
     "num_future_obs": 5,
     "task_sampling_freq": 1,
-    "model_save_freq": 5,
     "render_freq": 5,
     "planning_horizon": 4,
-    "n_trajectory": 256,
-    "is_first_order": true,
+    "n_trajectory": 512,
+    "is_first_order": false,
     "is_nested_grad": false
 }

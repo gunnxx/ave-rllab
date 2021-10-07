@@ -1,6 +1,6 @@
 from typing import Dict, Type
 
-import copy, imageio, json, os
+import copy, json
 import gym
 import numpy as np
 import torch
@@ -12,7 +12,7 @@ from learn2learn import clone_module, update_module
 from src.algo.algo import Algo, REGISTERED_OPTIM
 from src.buffer.consecutive_buffer import ConsecutiveBuffer
 from src.model.stochastic_model import StochasticModel
-from src.utils.common import cast_to_torch, label_frame
+from src.utils.common import cast_to_torch
 from src.utils.logger import Logger
 from src.utils.timer import Timer
 
@@ -41,7 +41,6 @@ class GrBAL(Algo):
     "num_past_obs": 15,
     "num_future_obs": 5,
     "task_sampling_freq": 1,
-    "model_save_freq": 1,
     "render_freq": 5,
     "planning_horizon": 4,
     "n_trajectory": 256,
@@ -111,9 +110,6 @@ class GrBAL(Algo):
     task_sampling_freq:
       how often to collect trajectories i.e.
       `epoch % task_sampling_freq == 0`
-    model_save_freq:
-      how often to save the model i.e.
-      `epoch % model_save_freq == 0`
     render_freq:
       how often to render the agent during testing
     planning_horizon:
@@ -154,7 +150,6 @@ class GrBAL(Algo):
     num_past_obs: int,
     num_future_obs: int,
     task_sampling_freq: int,
-    model_save_freq: int,
     render_freq: int,
     planning_horizon: int,
     n_trajectory: int,
@@ -165,10 +160,6 @@ class GrBAL(Algo):
     self.test_env: gym.Env = copy.deepcopy(self.env)
     self.device : torch.device = torch.device(device)
     self.logger : Logger = Logger(exp_dir)
-
-    ### TEMPORARY ###
-    os.makedirs(os.path.join(exp_dir, "gifs"))
-    self.gif_path : str = os.path.join(exp_dir, "gifs")
 
     ## set the random seed
     torch.manual_seed(seed)
@@ -186,7 +177,6 @@ class GrBAL(Algo):
     self.testing_episode : int = testing_episode
     self.max_episode_length : int = max_episode_length
     self.policy_start_steps : int = policy_start_steps
-    self.model_save_freq : int = model_save_freq
     self.render_freq : int = render_freq
 
     # meta-learning and adaptation hyperparams
@@ -438,6 +428,10 @@ class GrBAL(Algo):
     episode_ret = 0
     episode_len = 0
 
+    best_train_loss =  float("inf")
+    best_train_ret  = -float("inf")
+    best_test_ret   = -float("inf")
+
     for epoch in tqdm(range(self.training_epoch)):
       timer.reset()
 
@@ -506,12 +500,12 @@ class GrBAL(Algo):
         # rendering purpose
         frames = []
         do_render = epoch % self.render_freq == 0 or \
-          epoch == self.training_epoch
+          epoch == self.training_epoch - 1
         
         if do_render:
-          frame = self.test_env.render(mode="rgb_array")
-          frames.append(label_frame(frame, epoch=epoch,
-            ret=_episode_ret, len=_episode_len))
+          frames.append( # kind of ugly, but ok
+          self.test_env.env.render("rgb_array",
+          {'epoch': epoch, 'ret':_episode_ret, 'len':_episode_len}))
         
         # testing episode loop
         while(True):
@@ -525,9 +519,9 @@ class GrBAL(Algo):
           
           # render
           if do_render:
-            frame = self.test_env.render(mode="rgb_array")
-            frames.append(label_frame(frame, epoch=epoch,
-              ret=_episode_ret, len=_episode_len))
+            frames.append( # kind of ugly, but ok
+            self.test_env.env.render("rgb_array",
+            {'epoch': epoch, 'ret':_episode_ret, 'len':_episode_len}))
 
           # update values
           _obs = _next_obs
@@ -545,9 +539,8 @@ class GrBAL(Algo):
             break
         
         if do_render:
-          imageio.mimwrite(os.path.join(
-            self.gif_path, "epoch%03d.%d.gif" % (epoch, i)),
-            frames, fps=30)
+          self.logger.save_as_gif(frames,
+            "epoch%03d.%d.gif" % (epoch, i), fps=30)
 
       ##################
       ## END OF EPOCH ##
@@ -557,16 +550,40 @@ class GrBAL(Algo):
         time_elapsed=timer.elapsed()
       )
 
-      # saving
-      if epoch % self.model_save_freq == 0 or \
-         epoch == self.training_epoch - 1:
-        self.logger.torch_save({
-          "epoch": epoch,
-          "model_dict": self.model_dynamics.state_dict(),
-          "optim_dict": self.meta_optimizer.state_dict(),
-          "buffer_obj": self.buffer,
-          "env_obj": self.env
-        }, "chkpt.%03d.pt" % epoch)
+      # compute current epoch loss and returns
+      train_loss = self.logger.epoch_log.get(
+        'loss', [float('inf')])
+      train_ret = self.logger.epoch_log.get(
+        'training_episode_ret', [-float('inf')])
+      test_ret = self.logger.epoch_log.get(
+        'testing_episode_ret', [-float('inf')])
+
+      train_loss = np.average(train_loss).item()
+      train_ret = np.average(train_ret).item()
+      test_ret = np.average(test_ret).item()
+
+      # save the best and the latest model
+      chkpt = {
+        "epoch": epoch,
+        "model_dict": self.model_dynamics.state_dict(),
+        "optim_dict": self.meta_optimizer.state_dict(),
+        "buffer_obj": self.buffer,
+        "env_obj": self.env
+      }
+
+      if train_loss < best_train_loss:
+        self.logger.torch_save(chkpt, "best_train_loss.pt")
+        best_train_loss = train_loss
+      
+      if train_ret > best_train_ret:
+        self.logger.torch_save(chkpt, "best_train_ret.pt")
+        best_train_ret = train_ret
+      
+      if test_ret > best_test_ret:
+        self.logger.torch_save(chkpt, "best_test_ret.pt")
+        best_test_ret = test_ret
+
+      self.logger.torch_save(chkpt, "latest.pt")
       
       # logging and printing
       # json.dumps() to pretty print dict
