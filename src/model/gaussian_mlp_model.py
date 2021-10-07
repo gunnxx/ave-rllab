@@ -64,14 +64,16 @@ class GaussianMLPModel(StochasticModel):
   Needs to make sure that `std > 0`.
   Passing the output of `log_std_layer` to `exp()` is not enough
   because sometimes `exp()` outputs zero e.g. for input -300.
-  The downside is that the `std` is lower-bounded by `exp(0)`.
   """
   def _distribution(self,
     x: torch.Tensor) -> Distribution:
     base_net_out = self.base_net(x)
 
     mu = self.mu_layer(base_net_out)
-    std = torch.exp(F.softplus(self.log_std_layer(base_net_out)))
+    log_std = self.log_std_layer(base_net_out)
+    log_std = torch.clamp(log_std, -20, 2)
+    std = torch.exp(log_std)
+
     dist = Independent(Normal(mu, std), 1)
     return TransformedDistribution(dist, self.transforms)
 
