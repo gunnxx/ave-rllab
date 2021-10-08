@@ -25,7 +25,7 @@ def create_mlp(
 """
 """
 def cast_to_torch(
-  data: Union[torch.Tensor, np.array],
+  data: Union[torch.Tensor, np.ndarray],
   dtype: torch.dtype,
   device: torch.device) -> torch.Tensor:
   
