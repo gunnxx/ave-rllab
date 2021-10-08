@@ -270,7 +270,7 @@ class GrBAL(Algo):
       
       clone_model_dynamics = update_module(
         clone_model_dynamics,
-        updates=tuple(self.task_learning_rate*g for g in grad))
+        updates=tuple(-self.task_learning_rate*g for g in grad))
 
     return clone_model_dynamics
 
@@ -324,7 +324,7 @@ class GrBAL(Algo):
         
         clone_model_dynamics = update_module(
           clone_model_dynamics,
-          updates=tuple(self.task_learning_rate*g for g in grad))
+          updates=tuple(-self.task_learning_rate*g for g in grad))
       
       # meta-gradient
       log_prob_model = clone_model_dynamics.log_prob_from_data(
@@ -376,12 +376,16 @@ class GrBAL(Algo):
     ## reward = new_potential - old_potential
     ## potential = -L2 distance to target
     if self.env.spec.id == 'BrokenReacherPyBulletEnv-v0':
-      old_potential = -torch.linalg.norm(curr_obs[:, 2:3], dim=1)
+      # old_potential = -torch.linalg.norm(curr_obs[:, 2:3], dim=1)
+      old_potential = 0
 
     ## reward = speed towards x-axis (vx_body * cos angle_to_target)
     ## potential = 0, recording potential just to unify the API later
     elif self.env.spec.id == 'BrokenAntPyBulletEnv-v0':
-      old_potential = torch.tensor(0, torch.float32, self.device)
+      old_potential = 0
+    
+    elif self.env.spec.id == 'PointEnv-v0':
+      old_potential = 0
 
     else:
       raise NotImplementedError("""Reward func is hard-coded,
@@ -392,7 +396,7 @@ class GrBAL(Algo):
       with torch.no_grad():
         next_obs, _ = model(
           torch.cat([curr_obs, act[i]], dim=-1),
-          deterministic=False,
+          deterministic=True,
           with_logprob=False)
       
       '''
@@ -404,10 +408,17 @@ class GrBAL(Algo):
       if self.env.spec.id == 'BrokenReacherPyBulletEnv-v0':
         potential = -torch.linalg.norm(next_obs[:, 2:3], dim=1)
         reward = potential - old_potential
-        old_potential = potential
+        # old_potential = potential
+        old_potential = 0
       
       elif self.env.spec.id == 'BrokenAntPyBulletEnv-v0':
         potential = next_obs[:, 2] * next_obs[:, 3]
+        reward = potential - old_potential
+        old_potential = 0
+      
+      elif self.env.spec.id == 'PointEnv-v0':
+        goal = torch.from_numpy(self.test_env.goal)
+        potential = -torch.linalg.norm(goal - next_obs, dim=1)
         reward = potential - old_potential
         old_potential = 0
       

@@ -13,3 +13,10 @@ register(
   max_episode_steps=1000,
   reward_threshold=2500.0
   )
+
+register(
+  id='PointEnv-v0',
+  entry_point='src.env.point:PointEnv',
+  max_episode_steps=20,
+  reward_threshold=0.
+  )
