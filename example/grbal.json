@@ -20,20 +20,19 @@
         "activation": "relu",
         "sample_scaling": null
     },
-    "buffer_type": "consecutive_buffer",
+    "buffer_type": "random_buffer",
     "buffer_params": {
         "buffer_size": 10000,
-        "consecutive_size": 20,
         "device": "cpu"
     },
     "meta_optimizer_type": "adam",
     "meta_optimizer_params": {},
     "num_inner_grad_steps": 1,
-    "num_past_obs": 15,
-    "num_future_obs": 5,
+    "num_past_obs": 16,
+    "num_future_obs": 16,
     "task_sampling_freq": 1,
     "render_freq": 5,
-    "planning_horizon": 4,
+    "planning_horizon": 16,
     "n_trajectory": 512,
     "is_first_order": false,
     "is_nested_grad": false

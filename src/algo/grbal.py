@@ -10,7 +10,7 @@ from tqdm import tqdm
 from learn2learn import clone_module, update_module
 
 from src.algo.algo import Algo, REGISTERED_OPTIM
-from src.buffer.consecutive_buffer import ConsecutiveBuffer
+from src.buffer.buffer import Buffer
 from src.model.stochastic_model import StochasticModel
 from src.utils.common import cast_to_torch
 from src.utils.logger import Logger
@@ -33,7 +33,7 @@ class GrBAL(Algo):
     "policy_start_steps": 1000,
     "model_dynamics_type": "gaussian_mlp_model",
     "model_dynamics_params": {},
-    "buffer_type": "consecutive_buffer",
+    "buffer_type": "random_buffer",
     "buffer_params": {},
     "meta_optimizer_type": "adam",
     "meta_optimizer_params": {},
@@ -90,8 +90,7 @@ class GrBAL(Algo):
     model_dynamics_params:
       parameters to instantiate the `model_dynamics_type`
     buffer_type:
-      type of buffer used to store transition dynamics,
-      only accept `ConsecutiveBuffer`
+      type of buffer used to store transition dynamics
     buffer_params:
       parameters to instantiate `buffer_type`
     meta_optimizer_type:
@@ -142,7 +141,7 @@ class GrBAL(Algo):
     policy_start_steps: int,
     model_dynamics_type: Type[StochasticModel],
     model_dynamics_params: Dict,
-    buffer_type: Type[ConsecutiveBuffer],
+    buffer_type: Type[Buffer],
     buffer_params: Dict,
     meta_optimizer_type: str,
     meta_optimizer_params: Dict,
@@ -164,8 +163,14 @@ class GrBAL(Algo):
     ## set the random seed
     torch.manual_seed(seed)
     np.random.seed(seed)
+
     self.env.seed(seed)
+    self.env.observation_space.seed(seed)
+    self.env.action_space.seed(seed)
+    
     self.test_env.seed(seed)
+    self.test_env.observation_space.seed(seed)
+    self.test_env.action_space.seed(seed)
 
     # general training optimization hyperparams
     self.batch_size : int = batch_size
@@ -183,6 +188,7 @@ class GrBAL(Algo):
     self.num_inner_grad_steps : int = num_inner_grad_steps
     self.num_past_obs : int = num_past_obs
     self.num_future_obs : int = num_future_obs
+    self.consecutive_size : int = num_past_obs + num_future_obs
     self.task_sampling_freq : int = task_sampling_freq
     self.planning_horizon : int = planning_horizon
     self.n_trajectory : int = n_trajectory
@@ -197,7 +203,7 @@ class GrBAL(Algo):
       model_dynamics_params).to(self.device)
 
     # instantiate replay buffer
-    self.buffer: ConsecutiveBuffer = \
+    self.buffer: Buffer = \
       buffer_type.instantiate_buffer(
       buffer_params)
     
@@ -212,18 +218,13 @@ class GrBAL(Algo):
   """
   @staticmethod
   def validate_params(params: Dict) -> None:
-    assert params["planning_horizon"] < params["num_future_obs"], \
+    assert params["planning_horizon"] <= params["num_future_obs"], \
     """Planning horizon should be less than adaptation horizon to
     better capture local context."""
 
     assert params["num_collection_steps"] >= params["num_past_obs"] \
     + params["num_future_obs"], """Collection steps should be greater
-    than the consecutive_size of the buffer. It needs to at least
-    store one entry in the buffer."""
-    
-    assert params["num_past_obs"] + params["num_future_obs"] == \
-    params["buffer_params"]["consecutive_size"], """This should match
-    because this chunk is considered as one situation."""
+    than the consecutive_size when sampling from the buffer."""
     
     assert params["env"].action_space.shape[0] + \
     params["env"].observation_space.shape[0] == \
@@ -238,12 +239,12 @@ class GrBAL(Algo):
   """
   """
   def _model_online_adaptation(self) -> StochasticModel:
-    # take the most recent entry in the buffer for model adaptiation
-    samples = self.buffer.sample_last_n(1)
+    # take the most recent entry in the buffer for model adaptation
+    samples = self.buffer.sample_last_n(self.num_past_obs)
 
-    obs = samples["obs"][0][-self.num_past_obs:, :]
-    act = samples["act"][0][-self.num_past_obs:, :]
-    next_obs = samples["next_obs"][0][-self.num_past_obs:, :]
+    obs = samples["obs"]
+    act = samples["act"]
+    next_obs = samples["next_obs"]
 
     # zero-ing out gradients
     self.model_dynamics.zero_grad()
@@ -278,37 +279,33 @@ class GrBAL(Algo):
   """
   """
   def _model_meta_learn(self) -> None:
-    # batch_size is the number of tasks
-    # samples = (batch_sz, num_past_obs + num_future_obs, feature_sz)
-    samples = self.buffer.sample_batch(self.batch_size)
-    
-    obs = samples["obs"]
-    obs_support = obs[:, :self.num_past_obs, :]
-    obs_query   = obs[:, self.num_past_obs:, :]
-
-    act = samples["act"]
-    act_support = act[:, :self.num_past_obs, :]
-    act_query   = act[:, self.num_past_obs:, :]
-
-    next_obs = samples["next_obs"]
-    next_obs_support = next_obs[:, :self.num_past_obs, :]
-    next_obs_query   = next_obs[:, self.num_past_obs:, :]
-
-    # zero-ing out gradients
     self.model_dynamics.zero_grad()
 
-    # training
     meta_grads = tuple(torch.zeros_like(p)
       for p in self.model_dynamics.parameters())
-
-    for i in range(self.batch_size):
+    
+    # training loop
+    # batch_size = num_situation
+    for _ in range(self.batch_size):
       clone_model_dynamics = clone_module(self.model_dynamics)
+
+      # samples = (num_past_obs + num_future_obs, feature_sz)
+      samples = self.buffer.sample_consecutive(self.consecutive_size)
+
+      obs_support = samples["obs"][:self.num_past_obs, :]
+      obs_query   = samples["obs"][self.num_past_obs:, :]
+
+      act_support = samples["act"][:self.num_past_obs, :]
+      act_query   = samples["act"][self.num_past_obs:, :]
+
+      next_obs_support = samples["next_obs"][:self.num_past_obs, :]
+      next_obs_query   = samples["next_obs"][self.num_past_obs:, :]
 
       # inner grad-descent loop (task training)
       for _ in range(self.num_inner_grad_steps):
         log_prob_model = clone_model_dynamics.log_prob_from_data(
-          torch.cat([obs_support[i], act_support[i]], dim=-1),
-          next_obs_support[i])
+          torch.cat([obs_support, act_support], dim=-1),
+          next_obs_support)
         
         # whether nested-MAML, orig-MAML, or fo-MAML
         if self.is_nested_grad:
@@ -328,8 +325,8 @@ class GrBAL(Algo):
       
       # meta-gradient
       log_prob_model = clone_model_dynamics.log_prob_from_data(
-        torch.cat([obs_query[i], act_query[i]], dim=-1),
-        next_obs_query[i])
+        torch.cat([obs_query, act_query], dim=-1),
+        next_obs_query)
       
       grad = torch.autograd.grad(
         -log_prob_model.mean(),
@@ -350,7 +347,8 @@ class GrBAL(Algo):
   def _random_shooting_controller(self,
     model: StochasticModel,
     n_trajectory: int,
-    curr_obs: np.ndarray) -> torch.Tensor:
+    curr_obs: np.ndarray,
+    curr_env: gym.Env) -> torch.Tensor:
     # initialize reward
     rewards = torch.zeros(n_trajectory).to(self.device)
 
@@ -417,7 +415,7 @@ class GrBAL(Algo):
         old_potential = 0
       
       elif self.env.spec.id == 'PointEnv-v0':
-        goal = torch.from_numpy(self.test_env.goal)
+        goal = torch.from_numpy(curr_env.goal)
         potential = -torch.linalg.norm(goal - next_obs, dim=1)
         reward = potential - old_potential
         old_potential = 0
@@ -458,7 +456,7 @@ class GrBAL(Algo):
           else:
             act = self._random_shooting_controller(
               self._model_online_adaptation(),
-              self.n_trajectory, obs)
+              self.n_trajectory, obs, self.env)
           
           # step in the environment
           next_obs, rew, done, info = self.env.step(act)
@@ -510,8 +508,8 @@ class GrBAL(Algo):
 
         # rendering purpose
         frames = []
-        do_render = epoch % self.render_freq == 0 or \
-          epoch == self.training_epoch - 1
+        do_render = (epoch + 1) % self.render_freq == 0 or \
+          (epoch + 1) == self.training_epoch
         
         if do_render:
           frames.append( # kind of ugly, but ok
@@ -522,7 +520,7 @@ class GrBAL(Algo):
         while(True):
           _act = self._random_shooting_controller(
             self._model_online_adaptation(),
-            self.n_trajectory, _obs)
+            self.n_trajectory, _obs, self.test_env)
           
           # step in the environment
           _next_obs, _rew, _done, _info = self.test_env.step(_act)
