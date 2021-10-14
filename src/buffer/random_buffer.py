@@ -1,4 +1,4 @@
-from typing import Dict
+from typing import List, Dict
 
 import torch
 import numpy as np
@@ -41,7 +41,19 @@ class RandomBuffer(Buffer):
   
   """
   """
-  def _sampler(self, batch_size: int) -> Dict[str, torch.Tensor]:
-    idx = np.random.randint(0, self.size, size=batch_size)    
-    return {k: v[idx] for k, v in self.data.items()}
-    
+  def _idx_sampler(self, size: int) -> List[int]:
+    idx = np.random.randint(0, self.size, size=size)
+    return idx.tolist()
+  
+  """
+  """
+  def _consecutive_idx_sampler(self, size: int) -> List[int]:
+    # when full, in low: max_size - size = 0
+    # when not full, in low: ptr - size = 0
+    low = self.max_size - self.size + self.ptr + size - 1
+    high = self.max_size + self.ptr
+    last_idx = np.random.randint(low, high)
+
+    idx = np.arange(last_idx - size, last_idx)
+    idx = (idx + 1) % self.max_size
+    return idx.tolist()

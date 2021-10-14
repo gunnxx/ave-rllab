@@ -37,7 +37,12 @@ class Buffer:
 
   """
   """
-  def _sampler(self, batch_size: int) -> Dict[str, torch.Tensor]:
+  def _idx_sampler(self, size: int) -> List[int]:
+    raise NotImplementedError()
+  
+  """
+  """
+  def _consecutive_idx_sampler(self, size: int) -> List[int]:
     raise NotImplementedError()
 
   """
@@ -53,11 +58,6 @@ class Buffer:
   
   """
   """
-  def sample_batch(self, batch_size: int) -> Dict[str, torch.Tensor]:
-    return self._sampler(batch_size)
-  
-  """
-  """
   def sample_idx(self, idx: List[int]) -> Dict[str, torch.Tensor]:
     return {k:v[idx] for k, v in self.data.items()}
 
@@ -66,6 +66,20 @@ class Buffer:
   def sample_last_n(self, n: int) -> Dict[str, torch.Tensor]:
     assert n <= self.size, "The buffer does not have >=n elements"
     idx = list(range(self.ptr - n, self.ptr))
+    return self.sample_idx(idx)
+  
+  """
+  """
+  def sample_batch(self, batch_size: int) -> Dict[str, torch.Tensor]:
+    idx = self._idx_sampler(batch_size)
+    return self.sample_idx(idx)
+  
+  """
+  """
+  def sample_consecutive(self, size: int) -> Dict[str, torch.Tensor]:
+    assert size <= self.size, """The buffer does not have enough
+    elements."""
+    idx = self._consecutive_idx_sampler(size)
     return self.sample_idx(idx)
   
   """

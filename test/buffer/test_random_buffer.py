@@ -69,6 +69,7 @@ def test_method_sample():
   assert buffer.sample_batch(batch_sz)["data"].shape == (batch_sz, 2, 3)
   assert buffer.sample_last_n(last_n)["data"].shape == (last_n, 2, 3)
   assert buffer.sample_idx(idx)["data"].shape == (len(idx), 2, 3)
+  assert buffer.sample_consecutive(6)["data"].shape == (6, 2, 3)
 
 
 def test_condition_circular_when_full_buffer():
@@ -90,6 +91,9 @@ def test_condition_circular_when_full_buffer():
   assert torch.equal( # check n-newest content
     buffer.sample_last_n(2)["key"],
     batch_data(data[-2], data[-1]))
+  assert torch.equal(
+    buffer.sample_consecutive(6)["key"],
+    batch_data(*data))
   
   # add twice data overflows
   for _ in range(2):
@@ -104,3 +108,6 @@ def test_condition_circular_when_full_buffer():
   assert torch.equal( # check n-newest content
     buffer.sample_last_n(2)["key"],
     batch_data(data[-2], data[-1]))
+  assert torch.equal(
+    buffer.sample_consecutive(6)["key"],
+    batch_data(*data[2:8]))
