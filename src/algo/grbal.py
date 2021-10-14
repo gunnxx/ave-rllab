@@ -404,7 +404,7 @@ class GrBAL(Algo):
       of the environment whose parameter is current_obs.
       '''
       if self.env.spec.id == 'BrokenReacherPyBulletEnv-v0':
-        potential = -torch.linalg.norm(next_obs[:, 2:3], dim=1)
+        potential = -torch.linalg.norm(next_obs[:, 2:4], dim=1)
         reward = potential - old_potential
         # old_potential = potential
         old_potential = 0
@@ -415,7 +415,7 @@ class GrBAL(Algo):
         old_potential = 0
       
       elif self.env.spec.id == 'PointEnv-v0':
-        goal = torch.from_numpy(curr_env.goal)
+        goal = cast_to_torch(curr_env.goal, torch.float32, self.device)
         potential = -torch.linalg.norm(goal - next_obs, dim=1)
         reward = potential - old_potential
         old_potential = 0
