@@ -11,23 +11,22 @@ class PointEnv(Env):
   """
   def __init__(self, goal = None):
     self.reset(goal)
+    self.action_space = Box(low=-0.1, high=0.1, shape=(2,))
+    self.observation_space = Box(low=-np.inf, high=np.inf, shape=(2,))
   
-  @property
-  def observation_space(self):
-    return Box(low=-np.inf, high=np.inf, shape=(2,))
-  
-  @property
-  def action_space(self):
-    return Box(low=-0.1, high=0.1, shape=(2,))
-  
-  @property
-  def state(self):
-    return self._state
-
+  """
+  """
   @property
   def goal(self):
     return self._goal
   
+  """
+  Needed to compute reward from predicted_obs from model.
+  """
+  @staticmethod
+  def reward_from_obs(obs: Tensor) -> Tensor:
+    pass
+
   """
   """
   def reset(self, goal=None):
@@ -55,6 +54,7 @@ class PointEnv(Env):
   Render square of size (-0.7, 0.7) in x and y axis.
   Discretization level = 0.05.
   `mode` and `labels` are needed like other envs.
+  They are unused parameters in this environment.
   """
   def render(self, mode, labels):
     img = np.ones((29, 29)).astype('uint8') * 255
