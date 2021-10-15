@@ -404,9 +404,9 @@ class GrBAL(Algo):
       of the environment whose parameter is current_obs.
       '''
       if self.env.spec.id == 'BrokenReacherPyBulletEnv-v0':
-        potential = -torch.linalg.norm(next_obs[:, 2:4], dim=1)
+        goal = cast_to_torch(curr_env.goal, torch.float32, self.device)
+        potential = -torch.linalg.norm(goal - next_obs[:, 4:], dim=1)
         reward = potential - old_potential
-        # old_potential = potential
         old_potential = 0
       
       elif self.env.spec.id == 'BrokenAntPyBulletEnv-v0':
@@ -512,9 +512,12 @@ class GrBAL(Algo):
           (epoch + 1) == self.training_epoch
         
         if do_render:
-          frames.append( # kind of ugly, but ok
-          self.test_env.env.render("rgb_array",
-          {'epoch': epoch, 'ret':_episode_ret, 'len':_episode_len}))
+          frames.append(
+            self.test_env.render("rgb_array",
+              labels={
+              'epoch': epoch,
+              'ret':_episode_ret,
+              'len':_episode_len}))
         
         # testing episode loop
         while(True):
@@ -528,9 +531,12 @@ class GrBAL(Algo):
           
           # render
           if do_render:
-            frames.append( # kind of ugly, but ok
-            self.test_env.env.render("rgb_array",
-            {'epoch': epoch, 'ret':_episode_ret, 'len':_episode_len}))
+            frames.append(
+              self.test_env.render("rgb_array",
+                labels={
+                'epoch': epoch,
+                'ret':_episode_ret,
+                'len':_episode_len}))
 
           # update values
           _obs = _next_obs

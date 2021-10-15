@@ -1,4 +1,7 @@
 from typing import Dict
+
+import gym.spaces
+import numpy as np
 from torch import Tensor
 from pybulletgym.envs.roboschool.envs.manipulation.reacher_env import ReacherBulletEnv
 
@@ -16,7 +19,20 @@ class BrokenReacherBulletEnv(ReacherBulletEnv, BrokenEnv):
     self._cam_pitch = -90
     self._cam_dist  = 0.6
   
+    # change the state from 9 to 6
+    high = np.inf * np.ones([6])
+    self.robot.observation_space = gym.spaces.Box(-high, high)
+  
   """
+  """
+  @property
+  def goal(self):
+    target_x, _ = self.robot.jdict["target_x"].current_position()
+    target_y, _ = self.robot.jdict["target_y"].current_position()
+    return np.array([target_x, target_y])
+  
+  """
+  Needed to compute reward from predicted_obs from model.
   """
   @staticmethod
   def reward_from_obs(obs: Tensor) -> Tensor:
@@ -25,11 +41,44 @@ class BrokenReacherBulletEnv(ReacherBulletEnv, BrokenEnv):
   """
   """
   def render(self, mode: str, labels: Dict):
-    frame = ReacherBulletEnv.render(self, mode)
+    frame = ReacherBulletEnv._render(self, mode)
     return label_frame(frame, **labels)
 
   """
   """
+  def reset(self):
+    obs = ReacherBulletEnv._reset(self)
+
+    t = self.robot.central_joint.current_relative_position()
+    fingertip = self.robot.fingertip.pose().xyz()
+
+    reduced_obs = np.array([
+      t[0],         # theta = central_joint
+      t[1],         # theta_dot
+      obs[7],       # gamma = elbow_joint
+      obs[8],       # gamma_dot
+      fingertip[0], # end-effector_x
+      fingertip[1]  # end-effector_y
+    ])
+
+    return reduced_obs
+
+  """
+  """
   def step(self, a):
-    return ReacherBulletEnv.step(self,
+    obs, rew, done, info = ReacherBulletEnv.step(self,
       BrokenEnv.apply_damage(self, a))
+    
+    t = self.robot.central_joint.current_relative_position()
+    fingertip = self.robot.fingertip.pose().xyz()
+    
+    reduced_obs = np.array([
+      t[0],         # theta = central_joint
+      t[1],         # theta_dot
+      obs[7],       # gamma = elbow_joint
+      obs[8],       # gamma_dot
+      fingertip[0], # end-effector_x
+      fingertip[1]  # end-effector_y
+    ])
+    
+    return reduced_obs, rew, done, info
