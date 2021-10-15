@@ -21,7 +21,7 @@ class BrokenReacherBulletEnv(ReacherBulletEnv, BrokenEnv):
   
     # change the state from 9 to 6
     high = np.inf * np.ones([6])
-    self.robot.observation_space = gym.spaces.Box(-high, high)
+    self.observation_space = gym.spaces.Box(-high, high)
   
   """
   """
