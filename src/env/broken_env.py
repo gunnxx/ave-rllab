@@ -5,37 +5,27 @@ import torch
 
 class BrokenEnv:
   """
-  reversed_polarity:
-    True  -> multiply the action by -1 (reverse)
-    False -> multiply the action by +1 (normal)
-  weakened_actuator:
-    On the range of [0., 1.]
+  actuator_damage:
+    Absolute value on the range of [0., 1.]
     0. -> dead actuator
-    1. -> normal actuator
+    1. -> normal actuator "force"
+    Sign of the value
+    + -> normal
+    - -> reverse movement
   """
   def __init__(self,
     n_actuators: int,
-    reversed_polarity: List[bool],
-    weakened_actuator: List[float]) -> None:
-
+    actuator_damage: List[float]) -> None:
     self.n_actuators = n_actuators
-    self.reversed_polarity = reversed_polarity
-    self.weakened_actuator = weakened_actuator
+    self.set_actuator_damage(actuator_damage)
   
   """
   """
-  def set_reversed_polarity(self,
-    reversed_polarity: List[bool]) -> None:
-    assert len(reversed_polarity) == self.n_actuators
-    self.reversed_polarity = reversed_polarity
-  
-  """
-  """
-  def set_weakened_actuator(self,
-    weakened_actuator: List[float]) -> None:
-    assert len(weakened_actuator) == self.n_actuators
-    for val in weakened_actuator: assert 0. <= val <= 1.
-    self.weakened_actuator = weakened_actuator
+  def set_actuator_damage(self,
+    actuator_damage: List[float]) -> None:
+    assert len(actuator_damage) == self.n_actuators
+    for v in actuator_damage: assert -1 <= v <= 1
+    self.actuator_damage = actuator_damage
   
   """
   TO DO
@@ -68,9 +58,10 @@ class BrokenEnv:
     number of actuators to be randomly damaged
   n_damages:
     number of random damages to be applied to each n_actuators
-    current version only support 2 types of damages
+    current version only support 3 types of damages;
+    1) weakening  and 2) reverse polarity.
   """
-  def randomize_broken_part(self,
+  def randomize_damage(self,
     n_actuators: int,
     n_damages: int) -> None:
     assert 0 <= n_actuators <= self.n_actuators
@@ -82,26 +73,24 @@ class BrokenEnv:
 
     # just sample all damages to all actuators
     weakened_actuator = np.random.uniform(size=self.n_actuators)
-    reversed_polarity = np.random.choice([True, False], size=self.n_actuators)
+    reversed_polarity = np.random.choice([1, -1], self.n_actuators)
+    actuator_damage = np.ones(self.n_actuators)
 
-    # shut off damages to actuators that are not meant to be damaged
+    # create the damage mask
     for idx in range(self.n_actuators):
-      if idx not in actuator_idx:
-        weakened_actuator[idx] = 1.
-        reversed_polarity[idx] = False
+      if idx in actuator_idx:
+        # filter the damage type
+        if 0 in damage_idx:
+          actuator_damage[idx] *= weakened_actuator[idx]
+        if 1 in damage_idx:
+          actuator_damage[idx] *= reversed_polarity[idx]
     
-    # filter the damage type
-    # current version only support 2 types of damages
-    if damage_idx[0]:
-      self.set_reversed_polarity(reversed_polarity)
-    if damage_idx[1]:
-      self.set_weakened_actuator(weakened_actuator)
+    # set the damage mask
+    self.set_actuator_damage(actuator_damage)
   
   """
   """
   def apply_damage(self,
     a: Union[torch.Tensor, np.ndarray]) -> np.ndarray:
-    act_modifier = np.array([-1 if i else 1 for i in self.reversed_polarity])
-    act_modifier = act_modifier * self.weakened_actuator
     if type(a) == torch.Tensor: a = a.cpu().numpy()
-    return a * act_modifier
+    return a * self.actuator_damage
