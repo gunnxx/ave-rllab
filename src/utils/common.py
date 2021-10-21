@@ -63,3 +63,11 @@ def label_frame(
     y_loc += 15
   
   return im
+
+"""
+"""
+def warn_and_ask(text: str) -> None:
+  ans = input(text)
+  if ans.lower() == 'y': pass
+  elif ans.lower() == 'n': raise AssertionError("Terminated due to warning.")
+  else: raise KeyError("Answer is not recognized.")
