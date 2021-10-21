@@ -1,7 +1,7 @@
 import numpy as np
+import torch
 from gym import Env
 from gym.spaces import Box
-from torch import Tensor
 
 class PointEnv(Env):
   """
@@ -24,8 +24,10 @@ class PointEnv(Env):
   Needed to compute reward from predicted_obs from model.
   """
   @staticmethod
-  def reward_from_obs(obs: Tensor) -> Tensor:
-    pass
+  def reward_from_obs_and_goal(
+    obs: torch.Tensor,
+    goal: torch.Tensor) -> torch.Tensor:
+    return -torch.linalg.norm(goal - obs, dim=-1)
 
   """
   """
@@ -41,7 +43,7 @@ class PointEnv(Env):
   """
   """
   def step(self, action):
-    if type(action) == Tensor:
+    if type(action) == torch.Tensor:
       action = action.cpu().numpy()
     self._state = self._state + action
 

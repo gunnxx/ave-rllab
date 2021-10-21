@@ -1,8 +1,8 @@
-from typing import Dict
+from typing import Dict, List
 
 import gym.spaces
 import numpy as np
-from torch import Tensor
+import torch
 from pybulletgym.envs.roboschool.envs.manipulation.reacher_env import ReacherBulletEnv
 
 from src.env.broken_env import BrokenEnv
@@ -35,8 +35,11 @@ class BrokenReacherBulletEnv(ReacherBulletEnv, BrokenEnv):
   Needed to compute reward from predicted_obs from model.
   """
   @staticmethod
-  def reward_from_obs(obs: Tensor) -> Tensor:
-    pass
+  def reward_from_obs_and_goal(
+    obs: torch.Tensor,
+    goal: torch.Tensor) -> torch.Tensor:
+    sse = torch.pow(obs[..., :2] - goal, 2).sum(-1)
+    return torch.exp(-sse)
 
   """
   """
@@ -46,8 +49,11 @@ class BrokenReacherBulletEnv(ReacherBulletEnv, BrokenEnv):
 
   """
   """
-  def reset(self):
+  def reset(self, actuator_damage: List[float] = None):
     obs = ReacherBulletEnv._reset(self)
+
+    if actuator_damage:
+      BrokenEnv.set_actuator_damage(self, actuator_damage)
 
     t = self.robot.central_joint.current_relative_position()
     fingertip = self.robot.fingertip.pose().xyz()
