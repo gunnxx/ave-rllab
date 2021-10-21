@@ -13,6 +13,20 @@ REGISTERED_ACTIVATION_FUNC = {
 class Model(nn.Module):
   """
   """
+  def __init__(self, input_dim: int, output_dim: int) -> None:
+    super().__init__()
+    self.input_dim : int = input_dim
+    self.output_dim : int = output_dim
+  
+  """
+  """
+  @staticmethod
+  def validate_params(params: Dict) -> None:
+    assert params["input_dim"] > 0
+    assert params["output_dim"] > 0
+
+  """
+  """
   @classmethod
   def instantiate_model(
     model_type: "Type[Model]",

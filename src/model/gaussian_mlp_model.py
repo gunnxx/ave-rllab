@@ -1,14 +1,11 @@
-from typing import Dict, List, Tuple, Union
+from typing import Any, Dict, List, Tuple
 
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-from torch.distributions import \
-  Distribution, Normal, Independent, TransformedDistribution
-from torch.distributions.transforms import \
-  AffineTransform, TanhTransform
+from torch import Tensor, clamp, exp, tanh
+from torch.nn import Linear, Sequential
+from torch.distributions import Distribution, Normal, Independent, TransformedDistribution
+from torch.distributions.transforms import AffineTransform, TanhTransform
 
-from src.model.model import REGISTERED_ACTIVATION_FUNC
+from src.model.model import Model, REGISTERED_ACTIVATION_FUNC
 from src.model.stochastic_model import StochasticModel
 from src.utils.common import create_mlp
 
@@ -34,67 +31,63 @@ class GaussianMLPModel(StochasticModel):
     hidden_size: List[int],
     activation: str,
     sample_scaling: float = None) -> None:
-    super().__init__()
+    
+    super().__init__(input_dim, output_dim)
+    
     act = REGISTERED_ACTIVATION_FUNC[activation]
-
     hidden_size : List[int] = [input_dim] + hidden_size
-    self.base_net : nn.Sequential = create_mlp(hidden_size, act, act)
-    self.mu_layer : nn.Linear = nn.Linear(hidden_size[-1], output_dim)
-    self.log_std_layer : nn.Linear = nn.Linear(hidden_size[-1], output_dim)
 
-    # squash through tanh() then scale if sample_scaling != None
+    ## networks
+    self.base_net : Sequential = create_mlp(hidden_size, act, act)
+    self.mu_layer : Linear = Linear(hidden_size[-1], output_dim)
+    self.log_std_layer : Linear = Linear(hidden_size[-1], output_dim)
+
+    ## squash through tanh() then scale if sample_scaling != None
     if sample_scaling:
-      self.transforms = [TanhTransform(),
-        AffineTransform(0, sample_scaling)]
-      self.transform_fn = lambda x: torch.tanh(x)*sample_scaling
-    # do nothing if sampling_scale == None
+      self.transforms = [TanhTransform(), AffineTransform(0, sample_scaling)]
+      self.transform_fn = lambda x: tanh(x)*sample_scaling
+    
+    ## do nothing if sampling_scale == None
     else:
       self.transforms = [AffineTransform(0, 1)]
       self.transform_fn = lambda x: x
   
   """
-  """
-  @staticmethod
-  def validate_params(params: Dict) -> None:
-    assert params["input_dim"] > 0
-    assert params["output_dim"] > 0
-    assert len(params["hidden_size"]) >= 0
-
-  """
   Needs to make sure that `std > 0`.
-  Passing the output of `log_std_layer` to `exp()` is not enough
-  because sometimes `exp()` outputs zero e.g. for input -300.
   """
-  def _distribution(self,
-    x: torch.Tensor) -> Distribution:
+  def _distribution(self, x: Tensor) -> Distribution:
     base_net_out = self.base_net(x)
 
+    ## compute the Gaussian parameters
     mu = self.mu_layer(base_net_out)
     log_std = self.log_std_layer(base_net_out)
-    log_std = torch.clamp(log_std, -20, 2)
-    std = torch.exp(log_std)
+    log_std = clamp(log_std, -20, 2)
+    std = exp(log_std)
 
     dist = Independent(Normal(mu, std), 1)
     return TransformedDistribution(dist, self.transforms)
 
   """
   """
-  def forward(self,
-    x: torch.Tensor,
-    deterministic: bool,
-    with_logprob: bool
-    ) -> Tuple[torch.Tensor, Union[torch.Tensor, None]]:
+  def forward(self, x: Tensor, deterministic: bool, with_logprob: bool) -> Tuple[Tensor, Any]:
+    ## get the Gaussian
     distribution = self._distribution(x)
 
-    # sampling
+    ## sampling
     if deterministic:
       sample = distribution.base_dist.base_dist.mean
       sample = self.transform_fn(sample)
     else:
       sample = distribution.rsample()
 
-    # compute log_prob
-    log_prob_sample = distribution.log_prob(sample) \
-      if with_logprob else None
+    ## compute log_prob
+    log_prob_sample = distribution.log_prob(sample) if with_logprob else None
 
     return sample, log_prob_sample
+  
+  """
+  """
+  @staticmethod
+  def validate_params(params: Dict) -> None:
+    Model.validate_params(params)
+    assert len(params["hidden_size"]) >= 0
