@@ -1,0 +1,47 @@
+{
+  "env": "BrokenReacherPyBulletEnv-v0",
+  "device": "cpu",
+  "seed": 1501,
+  "exp_dir": "exp/famle",
+  "num_iter": 1,
+  "num_random_iter": 1,
+  "max_epoch_per_iter": 5000,
+  "render_freq": 1,
+  "batch_size": 512,
+  "num_episode_per_task": 100,
+  "max_episode_length": 150,
+  "num_samples_to_adapt": 150,
+  "buffer_type": "random_buffer",
+  "buffer_params": {
+    "buffer_size": 10000,
+    "device": "cpu"
+  },
+  "model_type": "deterministic_mlp_model",
+  "model_params": {
+    "input_dim": 16,
+    "output_dim": 6,
+    "hidden_size": [
+      256, 256, 256
+    ],
+    "activation": "relu",
+    "output_activation": "identity"
+  },
+  "embedding_dim": 8,
+  "mpc_horizon": 10,
+  "mpc_num_trajectories": 4096,
+  "task_learning_rate": 1e-4,
+  "meta_model_learning_rate": 3e-1,
+  "meta_embed_learning_rate": 3e-1,
+  "num_inner_grad_steps": 10,
+  "training_damages": [
+    [ 1,  1],
+    [-1,  1],
+    [ 1, -1],
+    [ 0,  1],
+    [ 1,  0]],
+  "testing_damages": [
+    [1,  1],
+    [1, -1],
+    [0,  1],
+    [0, -1]]
+}
