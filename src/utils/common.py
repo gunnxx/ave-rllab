@@ -1,4 +1,4 @@
-from typing import Dict, List, Tuple, Type, Union
+from typing import Any, List, Tuple, Type, Union
 
 import torch
 import torch.nn as nn
@@ -25,7 +25,7 @@ def create_mlp(
 """
 """
 def cast_to_torch(
-  data: Union[torch.Tensor, np.ndarray],
+  data: Union[torch.Tensor, np.ndarray, List[Any]],
   dtype: torch.dtype,
   device: torch.device) -> torch.Tensor:
   
