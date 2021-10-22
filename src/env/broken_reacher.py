@@ -2,7 +2,7 @@ from typing import Dict, List
 
 import gym.spaces
 import numpy as np
-import torch
+from torch import Tensor, exp, pow
 from pybulletgym.envs.roboschool.envs.manipulation.reacher_env import ReacherBulletEnv
 
 from src.env.broken_env import BrokenEnv
@@ -13,7 +13,7 @@ class BrokenReacherBulletEnv(ReacherBulletEnv, BrokenEnv):
   """
   def __init__(self) -> None:
     ReacherBulletEnv.__init__(self)
-    BrokenEnv.__init__(self, 2, [False]*2, [1.]*2)
+    BrokenEnv.__init__(self, 2, [1.]*2)
 
     # for better rendering result
     self._cam_pitch = -90
@@ -35,11 +35,9 @@ class BrokenReacherBulletEnv(ReacherBulletEnv, BrokenEnv):
   Needed to compute reward from predicted_obs from model.
   """
   @staticmethod
-  def reward_from_obs_and_goal(
-    obs: torch.Tensor,
-    goal: torch.Tensor) -> torch.Tensor:
-    sse = torch.pow(obs[..., :2] - goal, 2).sum(-1)
-    return torch.exp(-sse)
+  def reward_from_obs_and_goal(obs: Tensor, goal: Tensor) -> Tensor:
+    sse = pow(obs[..., :2] - goal, 2).sum(-1)
+    return exp(-sse)
 
   """
   """

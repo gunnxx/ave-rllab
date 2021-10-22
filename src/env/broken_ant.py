@@ -10,7 +10,7 @@ class BrokenAntBulletEnv(AntBulletEnv, BrokenEnv):
   """
   def __init__(self) -> None:
     AntBulletEnv.__init__(self)
-    BrokenEnv.__init__(self, 8, [False]*8, [1.]*8)
+    BrokenEnv.__init__(self, 8, [1.]*8)
 
   """
   """
