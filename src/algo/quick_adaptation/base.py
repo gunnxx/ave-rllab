@@ -164,10 +164,10 @@ class QuickAdaptBase(Algo):
       self.meta_learn_model(iter=iter)
 
       ## log: stdout
-      total = n * (iter + 1)
+      total = self.buffer[0].size * len(self.buffer)
       train_time = timer.elapsed() - collection_time
       tqdm.write("Training on %d datapoints for a maximum of %d iteration \
-      (epoch) with a batch size of %d/iteration takes %.02f s." % 
+        (epoch) with a batch size of %d/iteration takes %.02f s." % 
       (total, self.max_epoch_per_iter, self.batch_size, train_time))
 
       ## evaluate

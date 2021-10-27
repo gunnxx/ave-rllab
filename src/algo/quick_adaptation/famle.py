@@ -59,7 +59,7 @@ class FAMLE(QuickAdaptBase):
   # These will be used to change `buffer_type` from str to class variable of the model.
   # `buffer_params` will be overloaded by default params from the `buffer_type` class.
   BUFFER_CONFIG_KEYS = {
-    "buffer_type": "buffer_params",
+    "buffer_type": "buffer_params"
   }
 
   """
@@ -81,7 +81,7 @@ class FAMLE(QuickAdaptBase):
     buffer_type: Type[Buffer],
     buffer_params: Dict[str, Any],
     model_type: Type[DeterministicModel],
-    model_params: Dict,
+    model_params: Dict[str, Any],
     embedding_dim: int,
     mpc_horizon: int,
     mpc_num_trajectories: int,
@@ -138,7 +138,7 @@ class FAMLE(QuickAdaptBase):
     ## no adaptation, situation is randomly sampled
     if buffer["size"] == 0:
       task_idx = np.random.randint(0, self.num_training_task)
-      task_idx = torch.IntTensor([task_idx], device=self.device)
+      task_idx = cast_to_torch([task_idx], torch.int32, self.device)
       return (clone_model, clone_embed(task_idx).squeeze())
 
     clone_embed.train()
@@ -154,7 +154,7 @@ class FAMLE(QuickAdaptBase):
     buffer = self._process_sample(buffer)
     task_idx = self._estimate_task(buffer)
     batch_size = buffer["obs"].shape[0]
-    embed_in = torch.IntTensor([task_idx]*batch_size, device=self.device)
+    embed_in = cast_to_torch([task_idx]*batch_size, torch.int32, self.device)
 
     ## inner SGD loop ~ adaptation
     for _ in range(self.num_inner_grad_steps):
@@ -172,7 +172,7 @@ class FAMLE(QuickAdaptBase):
       loss.backward()
       clone_optim.step()
     
-    task_idx = torch.IntTensor([task_idx], device=self.device)
+    task_idx = cast_to_torch([task_idx], torch.int32, self.device)
     return (clone_model, clone_embed(task_idx).squeeze())
   
   """
@@ -200,15 +200,18 @@ class FAMLE(QuickAdaptBase):
     ## (embed_dim) -> (mpc_num_trajectories, embed_dim)
     embed_ = embed_.unsqueeze(0).repeat(self.mpc_num_trajectories, 1)
 
-    ## create sample container since we need to normalize the obs and act
-    sample = {"obs": deepcopy(obs), "act": act}
-    sample = self._process_sample(sample)
+    ## normalized all actions
+    act = (act - self.normalizer["act"][0]) / self.normalizer["act"][1]
 
     ## rollout sampled actions
     with torch.no_grad():
       for i in range(self.mpc_horizon):
+        ## normalized copy of current observation
+        obs_ = deepcopy(obs) 
+        obs_ = (obs_ - self.normalizer["obs"][0]) / self.normalizer["obs"][1]
+
         ## predict normalized-delta
-        in_ = torch.cat([sample["obs"], sample["act"][i], embed_], dim=-1)
+        in_ = torch.cat([obs_, act[i], embed_], dim=-1)
         diff = model(in_)
 
         ## denormalize
@@ -252,7 +255,7 @@ class FAMLE(QuickAdaptBase):
       ## prepare the input (requires_grad=False)
       sample = self.buffer[task_idx].sample_batch(self.batch_size)
       sample = self._process_sample(sample)
-      embed_in = torch.IntTensor([task_idx]*self.batch_size, device=self.device)
+      embed_in = cast_to_torch([task_idx]*self.batch_size, torch.int32, self.device)
       
       ## inner SGD loop
       for _ in range(self.num_inner_grad_steps):
@@ -299,7 +302,7 @@ class FAMLE(QuickAdaptBase):
         ## prepare the input
         sample = self.buffer[task_idx].sample_batch(self.batch_size)
         sample = self._process_sample(sample)
-        embed_in = torch.IntTensor([task_idx]*self.batch_size, device=self.device)
+        embed_in = cast_to_torch([task_idx]*self.batch_size, torch.int32, self.device)
         
         ## forward and compute loss
         embed_ = self.embed(embed_in)
@@ -389,7 +392,7 @@ class FAMLE(QuickAdaptBase):
       buffer = {k: v.unsqueeze(0).repeat(*_repeat) for k, v in buffer.items()}
 
       ## (training_task, embed_dim) -> (training_task, buffer_sz, embed_dim)
-      embed_ = self.embed(torch.IntTensor(embed_in_, device=self.device))
+      embed_ = self.embed(cast_to_torch(embed_in_, torch.int32, self.device))
       embed_ = embed_.unsqueeze(1).repeat(1, buffer_sz, 1)
 
       ## (training_task, buffer_sz, ..) -> (training_task * buffer_sz, ..)
@@ -409,17 +412,16 @@ class FAMLE(QuickAdaptBase):
   
   """
   """
-  def _get_checkpoint(self) -> Dict[str, Any]:
-    return {
-      "model": self.model.state_dict(),
-      "embed": self.embed.state_dict(),
-      "model_optim": self.model_optim.state_dict(),
-      "embed_optim": self.embed_optim.state_dict(),
-      "model_scheduler": self.model_scheduler.state_dict(),
-      "embed_scheduler": self.embed_scheduler.state_dict(),
-      "buffer": self.buffer,
-      "normalizer": self.normalizer
-    }
+  def _get_checkpoint(self, **kwargs) -> Dict[str, Any]:
+    kwargs["model"] = self.model.state_dict()
+    kwargs["embed"] = self.embed.state_dict(),
+    kwargs["model_optim"] = self.model_optim.state_dict(),
+    kwargs["embed_optim"] = self.embed_optim.state_dict(),
+    kwargs["model_scheduler"] = self.model_scheduler.state_dict(),
+    kwargs["embed_scheduler"] = self.embed_scheduler.state_dict(),
+    kwargs["buffer"] = self.buffer,
+    kwargs["normalizer"] = self.normalizer
+    return kwargs
 
   """
   """
