@@ -201,14 +201,14 @@ class FAMLE(QuickAdaptBase):
     embed_ = embed_.unsqueeze(0).repeat(self.mpc_num_trajectories, 1)
 
     ## normalized all actions
-    act = (act - self.normalizer["act"][0]) / self.normalizer["act"][1]
+    act = (act - self.normalizer["act"][0]) / (self.normalizer["act"][1] + 1e-10)
 
     ## rollout sampled actions
     with torch.no_grad():
       for i in range(self.mpc_horizon):
         ## normalized copy of current observation
         obs_ = deepcopy(obs) 
-        obs_ = (obs_ - self.normalizer["obs"][0]) / self.normalizer["obs"][1]
+        obs_ = (obs_ - self.normalizer["obs"][0]) / (self.normalizer["obs"][1] + 1e-10)
 
         ## predict normalized-delta
         in_ = torch.cat([obs_, act[i], embed_], dim=-1)
@@ -414,12 +414,12 @@ class FAMLE(QuickAdaptBase):
   """
   def _get_checkpoint(self, **kwargs) -> Dict[str, Any]:
     kwargs["model"] = self.model.state_dict()
-    kwargs["embed"] = self.embed.state_dict(),
-    kwargs["model_optim"] = self.model_optim.state_dict(),
-    kwargs["embed_optim"] = self.embed_optim.state_dict(),
-    kwargs["model_scheduler"] = self.model_scheduler.state_dict(),
-    kwargs["embed_scheduler"] = self.embed_scheduler.state_dict(),
-    kwargs["buffer"] = self.buffer,
+    kwargs["embed"] = self.embed.state_dict()
+    kwargs["model_optim"] = self.model_optim.state_dict()
+    kwargs["embed_optim"] = self.embed_optim.state_dict()
+    kwargs["model_scheduler"] = self.model_scheduler.state_dict()
+    kwargs["embed_scheduler"] = self.embed_scheduler.state_dict()
+    kwargs["buffer"] = self.buffer
     kwargs["normalizer"] = self.normalizer
     return kwargs
 
