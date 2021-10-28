@@ -2,7 +2,7 @@ from typing import Dict, List
 
 import gym.spaces
 import numpy as np
-from torch import Tensor, exp, pow
+from torch import Tensor, exp, norm, pow
 from pybulletgym.envs.roboschool.envs.manipulation.reacher_env import ReacherBulletEnv
 
 from src.env.broken_env import BrokenEnv
@@ -36,8 +36,9 @@ class BrokenReacherBulletEnv(ReacherBulletEnv, BrokenEnv):
   """
   @staticmethod
   def reward_from_obs_and_goal(obs: Tensor, goal: Tensor) -> Tensor:
-    sse = pow(obs[..., :2] - goal, 2).sum(-1)
-    return exp(-sse)
+    sse = pow(obs[..., -2:] - goal, 2).sum(-1)
+    spd = norm(obs[..., [1, 3]], dim=-1)
+    return exp(-sse) * 100 - spd
 
   """
   """
