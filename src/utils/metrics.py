@@ -43,9 +43,9 @@ class EarlyStopMetric:
     if self.iteration < self.warmup:
       return False
     
-    ## if there is progress among the last `self.patience` data excluding last element
-    for metric in self.metrics[:-1]:
-      if self.metrics[-1] < metric:
+    ## check progress among the last `self.patience`
+    for metric in self.metrics[1:]:
+      if metric < self.metrics[0]:
         return False
     
     ## no progress
