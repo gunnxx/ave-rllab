@@ -15,8 +15,8 @@ from tqdm import tqdm
 from src.algo.quick_adaptation.base import QuickAdaptBase
 from src.buffer.buffer import Buffer
 from src.model.deterministic_model import DeterministicModel
-from src.utils.common import cast_to_torch
-from src.utils.metrics import MovingAverage
+from src.utils.common import cast_to_torch, warn_and_ask
+from src.utils.metrics import EarlyStopMetric
 
 class GrBAL(QuickAdaptBase):
   # List of constructor parameters along its default values.
@@ -143,7 +143,7 @@ class GrBAL(QuickAdaptBase):
     clone_model.train()
 
     ## prepare the input
-    buffer = {k: cast_to_torch(v, torch.float32, self.device) for k, v in buffer}
+    buffer = {k: cast_to_torch(v, torch.float32, self.device) for k, v in buffer.items()}
     buffer = self._process_sample(buffer)
     in_ = torch.cat([buffer["obs"], buffer["act"]], dim=-1)
 
@@ -163,7 +163,7 @@ class GrBAL(QuickAdaptBase):
         g = grad(loss, clone_model.parameters(), create_graph=(not self.is_first_order))
       
       ## update using the computed gradient
-      updates = (-self.task_learning_rate * g_ for g_ in g)
+      updates = [-self.task_learning_rate * g_ for g_ in g]
       clone_model = update_module(clone_model, updates=updates)
     
     return clone_model
@@ -222,10 +222,10 @@ class GrBAL(QuickAdaptBase):
   """
   """
   def meta_learn_model(self, iter: int) -> None:
-    moving_avg = MovingAverage()
+    early_stop_metric = EarlyStopMetric(patience=3, decay=0)
 
     ## computed values are stored in `self.normalizer`
-    self._copmute_normalization_constant()
+    self._compute_normalization_constant()
 
     ## compute num of loops to be counted as one epoch
     total_train_data = self.num_training_task * self.buffer[0].size * self.max_episode_length
@@ -238,7 +238,12 @@ class GrBAL(QuickAdaptBase):
     for epoch in tqdm(range(self.max_epoch_per_iter), "Training", position=0, leave=False):
       self.model.train()
 
-      for _ in range(num_steps_per_epoch_train):
+      ## container for meta-loss and valid-loss
+      task_losses = np.zeros(num_steps_per_epoch_train)
+      meta_losses = np.zeros(num_steps_per_epoch_train)
+      valid_losses = np.zeros(num_steps_per_epoch_valid)
+
+      for step in range(num_steps_per_epoch_train):
         clone_model = clone_module(self.model)
 
         ## (batch_size, num_samples_to_adapt + num_future_obs, feature_sz)
@@ -273,13 +278,13 @@ class GrBAL(QuickAdaptBase):
             g = grad(loss, clone_model.parameters(), create_graph=(not self.is_first_order))
           
           ## update using the computed gradient
-          updates = (-self.task_learning_rate * g_ for g_ in g)
+          updates = [-self.task_learning_rate * g_ for g_ in g]
           clone_model = update_module(clone_model, updates=updates)
         
         ## meta-gradient computation
         delta_pred = clone_model(in_qry)
-        loss = self.loss_fn(delta_pred, delta_qry)
-        mg = grad(loss, self.model.parameters())
+        meta_loss = self.loss_fn(delta_pred, delta_qry)
+        mg = grad(meta_loss, self.model.parameters())
 
         ## overload `.grad` property of model parameters
         for p_, mg_ in zip(self.model.parameters(), mg):
@@ -288,10 +293,15 @@ class GrBAL(QuickAdaptBase):
         ## one step of optimization ~ meta-optimization
         self.optim.step()
       
+        ## save the loss
+        task_losses[step] = loss.item()
+        meta_losses[step] = meta_loss.item()
+        self.logger.epoch_store(task_loss=loss.item(), meta_loss=loss.item())
+      
       self.model.eval()
 
       ## validation
-      for epoch in range(num_steps_per_epoch_valid):
+      for step in range(num_steps_per_epoch_valid):
         ## prepare the input
         batch = self._get_batch(is_train=False)
         in_ = torch.cat([batch["obs"], batch["act"]], dim=-1)
@@ -300,13 +310,32 @@ class GrBAL(QuickAdaptBase):
         with torch.no_grad():
           delta_pred = self.model(in_)
           loss = self.loss_fn(delta_pred, batch["delta"])
+        
+        ## save the loss
+        valid_losses[step] = loss.item()
+        self.logger.epoch_store(valid_loss=loss.item())
       
-      ## lr-scheduler and early-stop
-      ## log
+      avg_meta_loss = meta_losses.mean()
+      avg_valid_loss = valid_losses.mean()
+
+      ## log: self.logger and stdout
+      log = {"iter": iter, "epoch": epoch, "meta-loss": avg_meta_loss, "valid-loss": avg_valid_loss}
+      self.logger.store(training=log)
+      self.logger.epoch_store(iter=iter, epoch=epoch)
+      self.logger.dump()
+
+      tqdm.write("Iter %02d Epoch %04d || %.04f || %.04f" %
+        (iter, epoch, avg_meta_loss.item(), avg_valid_loss.item()))
+
+      ## early-stop based on average validation loss
+      early_stop_metric(avg_valid_loss)
+      if early_stop_metric.is_stop():
+        tqdm.write("Early stopping is called!")
+        break 
   
   """
   """
-  def handle_end_of_iteration(self) -> None:
+  def handle_end_of_iteration(self, iter: int, time: float) -> None:
     chkpt = self._get_checkpoint()
     self.logger.torch_save(chkpt, "latest.pt")
   
@@ -377,11 +406,11 @@ class GrBAL(QuickAdaptBase):
     next_obs = []
 
     ## get the data
-    for idx in task_idx:
+    for idx, start, end in zip(task_idx, start_time_idx, end_time_idx):
       sample = self.buffer[idx].sample_batch(1)
-      obs += [sample["obs"][:, start_time_idx:end_time_idx, :]]
-      act += [sample["act"][:, start_time_idx:end_time_idx, :]]
-      next_obs += [sample["next_obs"][:, start_time_idx:end_time_idx, :]]
+      obs += [sample["obs"][:, start:end, :]]
+      act += [sample["act"][:, start:end, :]]
+      next_obs += [sample["next_obs"][:, start:end, :]]
     
     ## compute delta and normalize
     return self._process_sample({
@@ -404,4 +433,19 @@ class GrBAL(QuickAdaptBase):
   @staticmethod
   def validate_params(params: Dict) -> None:
     QuickAdaptBase.validate_params(params)
-    
+
+    ## model IO shape
+    obs_dim = params["env"].observation_space.shape[0]
+    act_dim = params["env"].action_space.shape[0]
+    inp_dim = obs_dim + act_dim
+
+    assert params["model_params"]["input_dim"] == inp_dim
+    assert params["model_params"]["output_dim"] == obs_dim
+
+    ## GrBAL specific
+    expected_n_episode_per_task = params["num_iter"] * params["num_episode_per_task"]
+    assert params["num_future_obs"] >= params["mpc_horizon"]
+    if expected_n_episode_per_task != params["buffer_params"]["buffer_size"]:
+      warn_and_ask("""The expected total number of episodes per taskis %02d episodes.
+      However, each buffer are expected to contain %02d episodes. Continue? (Y/N)""" %
+      (expected_n_episode_per_task, params["buffer_params"]["buffer_size"]))

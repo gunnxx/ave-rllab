@@ -1,39 +1,54 @@
 {
-    "env": "BrokenReacherPyBulletEnv-v0",
-    "device": "cpu",
-    "seed": 1501,
-    "exp_dir": "exp/grbal",
-    "batch_size": 16,
-    "task_learning_rate": 0.0005,
-    "training_epoch": 100,
-    "num_collection_steps": 1500,
-    "testing_episode": 3,
-    "max_episode_length": 150,
-    "policy_start_steps": 1500,
-    "model_dynamics_type": "gaussian_mlp_model",
-    "model_dynamics_params": {
-        "input_dim": 11,
-        "output_dim": 9,
-        "hidden_size": [
-            128, 128
-        ],
-        "activation": "relu",
-        "sample_scaling": null
-    },
-    "buffer_type": "random_buffer",
-    "buffer_params": {
-        "buffer_size": 10000,
-        "device": "cpu"
-    },
-    "meta_optimizer_type": "adam",
-    "meta_optimizer_params": {},
-    "num_inner_grad_steps": 1,
-    "num_past_obs": 16,
-    "num_future_obs": 16,
-    "task_sampling_freq": 1,
-    "render_freq": 5,
-    "planning_horizon": 16,
-    "n_trajectory": 512,
-    "is_first_order": false,
-    "is_nested_grad": false
+  "env": "BrokenReacherPyBulletEnv-v0",
+  "device": "cpu",
+  "seed": 1501,
+  "exp_dir": "exp/grbal",
+  "num_iter": 50,
+  "num_random_iter": 1,
+  "max_epoch_per_iter": 5000,
+  "render_freq": 1,
+  "batch_size": 512,
+  "num_episode_per_task": 12,
+  "max_episode_length": 100,
+  "mpc_horizon": 16,
+  "mpc_num_trajectories": 4096,
+  "buffer_type": "random_buffer",
+  "buffer_params": {
+    "buffer_size": 600,
+    "device": "cpu"
+  },
+  "model_type": "deterministic_mlp_model",
+  "model_params": {
+    "input_dim": 8,
+    "output_dim": 6,
+    "hidden_size": [
+      64, 64
+    ],
+    "activation": "relu",
+    "output_activation": "identity"
+  },
+  "task_learning_rate": 1e-4,
+  "meta_learning_rate": 1e-2,
+  "num_inner_grad_steps": 1,
+  "num_past_obs": 32,
+  "num_future_obs": 32,
+  "is_first_order": true,
+  "is_nested_grad": false,
+  "training_damages": [
+    [ 1,  1],
+    [-1,  1],
+    [ 1, -1],
+    [ 0,  1],
+    [ 1,  0]],
+  "validation_damages": [
+    [ 1,  1],
+    [-1,  1],
+    [ 1, -1],
+    [ 0,  1],
+    [ 1,  0]],
+  "testing_damages": [
+    [1,  1],
+    [1, -1],
+    [0,  1],
+    [0, -1]]
 }
