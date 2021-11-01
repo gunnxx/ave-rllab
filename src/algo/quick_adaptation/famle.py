@@ -328,7 +328,10 @@ class FAMLE(QuickAdaptBase):
   
   """
   """
-  def handle_end_of_iteration(self) -> None:
+  def handle_end_of_iteration(self, iter: int, time: float) -> None:
+    self.logger.epoch_store(iter=iter, time=time)
+    self.logger.dump()
+    
     chkpt = self._get_checkpoint()
     self.logger.torch_save(chkpt, "latest.pt")
   

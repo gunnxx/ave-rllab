@@ -229,9 +229,7 @@ class QuickAdaptBase(Algo):
       
       # -------------- END OF ITERATION: LOGGING -------------- #
         
-      self.logger.epoch_store(iter=iter, time=timer.elapsed())
-      self.handle_end_of_iteration()
-      self.logger.dump()
+      self.handle_end_of_iteration(iter, timer.elapsed())
     
     self.logger.close()
 
@@ -252,7 +250,7 @@ class QuickAdaptBase(Algo):
   
   """
   """
-  def handle_end_of_iteration(self) -> None:
+  def handle_end_of_iteration(self, iter: int, time: float) -> None:
     raise NotImplementedError()
   
   """
