@@ -285,10 +285,10 @@ class FAMLE(QuickAdaptBase):
       
       ## fill the pseudo-meta-gradient to the parameters().grad
       for p, mg in zip(self.model.parameters(), model_meta_grad):
-        p.grad = mg
+        p.grad = -mg
       
       for p, mg in zip(self.embed.parameters(), embed_meta_grad):
-        p.grad = mg
+        p.grad = -mg
       
       ## meta-update
       self.model_optim.step()
@@ -315,9 +315,9 @@ class FAMLE(QuickAdaptBase):
         moving_avg(loss.item())
       
       ## scheduler update based on moving avg loss of all training tasks
-      if (epoch + 1) % self.num_training_task == 0:
-        self.model_scheduler.step(moving_avg.data)
-        self.embed_scheduler.step(moving_avg.data)
+      # if (epoch + 1) % self.num_training_task == 0:
+      #   self.model_scheduler.step(moving_avg.data)
+      #   self.embed_scheduler.step(moving_avg.data)
       
       log = {"iter": iter, "task": task_idx, "loss": loss.item(), "ema-loss": moving_avg.data}
       self.logger.store(training=log)
