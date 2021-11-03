@@ -15,6 +15,13 @@ register(
   )
 
 register(
+  id='BrokenHalfCheetahPyBulletEnv-v0',
+  entry_point='src.env.broken_ant:BrokenAntBulletEnv',
+  max_episode_steps=1000,
+  reward_threshold=2500.0
+  )
+
+register(
   id='PointEnv-v0',
   entry_point='src.env.point:PointEnv',
   max_episode_steps=20,
