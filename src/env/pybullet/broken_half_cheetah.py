@@ -31,7 +31,7 @@ class BrokenHalfCheetahMujocoEnv(HalfCheetahMuJoCoEnv, BrokenEnv):
   """
   @staticmethod
   def reward(obs: Tensor, act: Tensor, next_obs: Tensor, goal: Tensor) -> Tensor:
-    pass
+    return (next_obs[0] - obs[0]) * 30 # 30 is just heuristic
 
   """
   """

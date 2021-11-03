@@ -29,5 +29,5 @@ register(
   id='BrokenHalfCheetahPyBulletEnv-v0',
   entry_point='src.env.pybullet.broken_half_cheetah:BrokenHalfCheetahMujocoEnv',
   max_episode_steps=1000,
-  reward_threshold=2500.0
+  reward_threshold=3000.0
 )
