@@ -26,10 +26,11 @@ class BrokenHalfCheetahMujocoEnv(HalfCheetahMuJoCoEnv, BrokenEnv):
     return None
   
   """
-  Needed to compute reward from predicted_obs from model.
+  Needed to compute reward for MPC.
+  Some parameters may not be used since this is intended to unify the API only.
   """
   @staticmethod
-  def reward_from_obs_and_goal(obs: Tensor, goal: Tensor) -> Tensor:
+  def reward(obs: Tensor, act: Tensor, next_obs: Tensor, goal: Tensor) -> Tensor:
     pass
 
   """

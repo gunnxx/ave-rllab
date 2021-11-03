@@ -218,13 +218,16 @@ class FAMLE(QuickAdaptBase):
         diff *= self.normalizer["delta"][1] + 1e-10
         diff += self.normalizer["delta"][0]
 
-        ## unnormalized next_obs
-        obs += diff
+        ## unnormalized predicted next_obs
+        next_obs = obs + diff
 
         ## compute reward: @staticmethod
         goal = torch.tensor(self.env.goal, device=self.device)
-        reward = self.env.reward_from_obs_and_goal(obs, goal)
+        reward = self.env.reward(obs, act[i], next_obs, goal)
         returns += reward
+
+        ## update obs for next iteration
+        obs = next_obs
     
     ## choose the first action of the best trajectory
     best_idx = torch.argmax(returns)

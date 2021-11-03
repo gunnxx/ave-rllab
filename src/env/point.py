@@ -22,11 +22,12 @@ class PointEnv(Env):
     return self._goal
   
   """
-  Needed to compute reward from predicted_obs from model.
+  Needed to compute reward for MPC.
+  Some parameters may not be used since this is intended to unify the API only.
   """
   @staticmethod
-  def reward_from_obs_and_goal(obs: Tensor, goal: Tensor) -> Tensor:
-    return -norm(goal - obs, dim=-1)
+  def reward(obs: Tensor, act: Tensor, next_obs: Tensor, goal: Tensor) -> Tensor:
+    return -norm(goal - next_obs, dim=-1)
 
   """
   """
