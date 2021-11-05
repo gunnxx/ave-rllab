@@ -444,7 +444,13 @@ class FAMLE(QuickAdaptBase):
     assert params["model_params"]["output_dim"] == obs_dim
 
     ## based on original FAMLE hyperparams
+    expected_ep_per_task = params["num_iter"] * params["num_episode_per_task"]
+    expected_ts_per_task = expected_ep_per_task * params["max_episode_length"]
     assert params["max_epoch_per_iter"] % len(params["training_damages"]) == 0
     if params["num_iter"] != 1:
       warn_and_ask("""Original FAMLE implementation uses only `num_iter = 1`.
       Currently, `num_iter = %d`. Continue? (Y/N)""" % params["num_iter"])
+    if expected_ts_per_task != params["buffer_params"]["buffer_size"]:
+      warn_and_ask("""The expected maximum tuples of transition is %d.
+      However, each buffer are expected to contain %d tuples of transition.
+      Continue? (Y/N)""" % (expected_ts_per_task, params["buffer_params"]["buffer_size"]))
