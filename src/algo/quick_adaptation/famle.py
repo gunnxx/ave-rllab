@@ -223,7 +223,7 @@ class FAMLE(QuickAdaptBase):
 
         ## compute reward: @staticmethod
         goal = torch.tensor(self.env.goal, device=self.device)
-        reward = self.env.reward(obs, act[i], next_obs, goal)
+        reward = self.env.reward_func(obs, act[i], next_obs, goal)
         returns += reward
 
         ## update obs for next iteration

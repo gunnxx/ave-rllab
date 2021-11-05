@@ -32,7 +32,7 @@ class BrokenAntBulletEnv(AntMuJoCoEnv, BrokenEnv):
   Some parameters may not be used since this is intended to unify the API only.
   """
   @staticmethod
-  def reward(obs: Tensor, act: Tensor, next_obs: Tensor, goal: Tensor) -> Tensor:
+  def reward_func(obs: Tensor, act: Tensor, next_obs: Tensor, goal: Tensor) -> Tensor:
     return next_obs[..., 13]
 
   """

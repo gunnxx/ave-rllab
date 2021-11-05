@@ -36,7 +36,7 @@ class BrokenReacherBulletEnv(ReacherBulletEnv, BrokenEnv):
   Some parameters may not be used since this is intended to unify the API only.
   """
   @staticmethod
-  def reward(obs: Tensor, act: Tensor, next_obs: Tensor, goal: Tensor) -> Tensor:
+  def reward_func(obs: Tensor, act: Tensor, next_obs: Tensor, goal: Tensor) -> Tensor:
     sse = pow(next_obs[..., -2:] - goal, 2).sum(-1)
     spd = norm(next_obs[..., [1, 3]], dim=-1)
     return exp(-sse) * 100 - spd

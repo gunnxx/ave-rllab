@@ -32,7 +32,7 @@ class BrokenHalfCheetahMujocoEnv(HalfCheetahMuJoCoEnv, BrokenEnv):
   Some parameters may not be used since this is intended to unify the API only.
   """
   @staticmethod
-  def reward(obs: Tensor, act: Tensor, next_obs: Tensor, goal: Tensor) -> Tensor:
+  def reward_func(obs: Tensor, act: Tensor, next_obs: Tensor, goal: Tensor) -> Tensor:
     ## 30 is just for scaling, no physical meaning
     return (next_obs[..., 0] - obs[..., 0]) * 30
 
