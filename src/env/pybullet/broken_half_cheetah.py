@@ -23,7 +23,9 @@ class BrokenHalfCheetahMujocoEnv(HalfCheetahMuJoCoEnv, BrokenEnv):
   """
   @property
   def goal(self):
-    return None
+    ## same as None but can't use None since None can't be converted into tensor
+    ## nevertheless, reward computation ignores this value
+    return 0.
   
   """
   Needed to compute reward for MPC.
@@ -31,7 +33,8 @@ class BrokenHalfCheetahMujocoEnv(HalfCheetahMuJoCoEnv, BrokenEnv):
   """
   @staticmethod
   def reward(obs: Tensor, act: Tensor, next_obs: Tensor, goal: Tensor) -> Tensor:
-    return (next_obs[0] - obs[0]) * 30 # 30 is just heuristic
+    ## 30 is just for scaling, no physical meaning
+    return (next_obs[..., 0] - obs[..., 0]) * 30
 
   """
   """
@@ -47,8 +50,8 @@ class BrokenHalfCheetahMujocoEnv(HalfCheetahMuJoCoEnv, BrokenEnv):
     if actuator_damage:
       BrokenEnv.set_actuator_damage(self, actuator_damage)
     
-    qpos = np.array([j.get_position() for j in self.ordered_joints], dtype=np.float32).flatten()
-    qvel = np.array([j.get_velocity() for j in self.ordered_joints], dtype=np.float32).flatten()
+    qpos = np.array([j.get_position() for j in self.robot.ordered_joints], dtype=np.float32).flatten()
+    qvel = np.array([j.get_velocity() for j in self.robot.ordered_joints], dtype=np.float32).flatten()
     
     return np.concatenate([qpos, qvel])
   
@@ -58,8 +61,8 @@ class BrokenHalfCheetahMujocoEnv(HalfCheetahMuJoCoEnv, BrokenEnv):
     _, rew, done, info = HalfCheetahMuJoCoEnv.step(self,
       BrokenEnv.apply_damage(self, a))
     
-    qpos = np.array([j.get_position() for j in self.ordered_joints], dtype=np.float32).flatten()
-    qvel = np.array([j.get_velocity() for j in self.ordered_joints], dtype=np.float32).flatten()
+    qpos = np.array([j.get_position() for j in self.robot.ordered_joints], dtype=np.float32).flatten()
+    qvel = np.array([j.get_velocity() for j in self.robot.ordered_joints], dtype=np.float32).flatten()
     obs = np.concatenate([qpos, qvel])
 
     return obs, rew, done, info
